@@ -191,10 +191,11 @@ const SidePanel = () => {
                           isSelected: true
                         };
                       } else {
-                        // If color is not available, keep it as is (don't change isSelected)
+                        // If color is not available, set it as unavailable and unselected
                         return {
                           ...pc,
-                          isAvailable: false
+                          isAvailable: false,
+                          isSelected: false
                         };
                       }
                     });
@@ -237,6 +238,13 @@ const SidePanel = () => {
       console.log("Reset palette colors:", updatedColors);
       return updatedColors;
     });
+  };
+  
+  // Function to handle refresh button click
+  const handleRefresh = () => {
+    console.log("Refresh button clicked, detecting available colors...");
+    // Instead of just resetting to free palette, actually detect available colors
+    detectAvailableColors();
   };
 
   const handleFileSelect = (file: File) => {
@@ -460,7 +468,7 @@ const SidePanel = () => {
             <ColorPalette 
               colors={paletteColors} 
               onColorToggle={handleColorToggle}
-              onRefreshPalette={detectAvailableColors}
+              onRefreshPalette={handleRefresh}
               onSelectAll={handleSelectAll}
               onDeselectAll={handleDeselectAll}
               areAllSelected={areAllSelected}

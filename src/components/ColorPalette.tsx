@@ -169,7 +169,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
               className="relative"
             >
               <div
-                className={`w-8 h-8 rounded cursor-pointer border-2 flex items-center justify-center text-xs font-bold`}
+                className={`w-8 h-8 rounded cursor-pointer border-2 flex items-center justify-center text-xs font-bold relative`}
                 style={{ 
                   width: '2rem',
                   height: '2rem',
@@ -182,11 +182,35 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white', // 默认白色文字
-                  textShadow: '0 0 2px rgba(0,0,0,0.5)' // 文字阴影以提高可读性
+                  textShadow: '0 0 2px rgba(0,0,0,0.5)', // 文字阴影以提高可读性
+                  // Add a subtle inner glow for selected items
+                  boxShadow: paletteColor.isSelected ? 'inset 0 0 0 2px rgba(255, 255, 255, 0.7)' : 'none',
+                  transform: paletteColor.isSelected ? 'scale(1.1)' : 'scale(1)',
+                  transition: 'all 0.2s ease-in-out',
+                  zIndex: paletteColor.isSelected ? 1 : 0
                 }}
                 onClick={() => onColorToggle(paletteColor.colorInfo.colorName)}
               >
                 {paletteColor.count > 0 ? paletteColor.count : ''}
+                {paletteColor.isSelected && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    width: '12px',
+                    height: '12px',
+                    backgroundColor: '#10b981', // green checkmark background
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid white'
+                  }}>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="white">
+                      <path d="M1.5 4 L3 5.5 L6.5 2" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
               </div>
               {!paletteColor.isAvailable && (
                 <div 
