@@ -1,0 +1,24 @@
+ 潜在问题点/需要确认的细节:
+
+   1. 侧边栏 Popup 的实现: Chrome Manifest V3 的 action（原
+      browser_action）默认是弹出一个小窗口（Popup），而不是页面侧边栏。要实现类似侧边栏的效果，可能需要：
+       * 选项 (A): 做一个宽度较大的 Popup 窗口，视觉上像侧边栏。
+       * 选项 (B): 使用 chrome.sidePanel API。这是一个较新的 API，允许在页面右侧打开一个扩展面板。这更符合“侧边栏”的描述，但需要在
+         manifest.json 中声明 side_panel 权限和配置，并且可能需要用户主动点击扩展图标一次后才能通过代码打开侧边栏。
+       * 你倾向于哪种实现方式？ sidePanel (更贴近描述) 还是 宽 Popup (更简单)？
+       
+       这个问题我倾向于选项B,直接使用侧边栏，pop看起来太廉价了
+
+   2. `pixelit.min.js` 的集成:
+       * 这是一个独立的 JS 库。在 Chrome 插件中，通常需要通过 manifest.json 的 web_accessible_resources 声明，然后在需要的页面（如
+         Content Script 或 Popup 页面）通过 <script> 标签动态注入，或者作为模块导入（如果支持）。
+       * 确认: 将其放在根目录是第一步，后续需要正确配置 manifest.json 和在代码中引用它。
+
+      你理解的没有错
+   3. Overlay 的实现细节:
+       * 定位: 以点击点为 overlay 图像中心进行定位，技术上可以通过计算点击坐标和图像尺寸来实现。
+       * 高亮/变暗: 改变透明度和亮度是可行的。这通常需要修改 overlay 图像中每个像素点的 RGBA 值，或者通过 CSS
+         对包含图像的容器应用滤镜（如 filter: brightness() opacity()）。哪种方式更适合 pixelit 生成的画布/图像数据需要验证。
+        
+        直接通过css处理即可
+

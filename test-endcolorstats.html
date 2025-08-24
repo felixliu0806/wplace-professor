@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test endColorStats</title>
+    <script src="public/pixelit.js"></script>
+</head>
+<body>
+    <h1>Test endColorStats</h1>
+    <img id="pixelitimg" src="now.png" style="visibility: hidden; position: fixed; top: 0; left: 0;" >
+    <canvas id="pixelitcanvas"></canvas>
+    
+    <script>
+        // 等待图像加载完成
+        const img = document.getElementById('pixelitimg');
+        img.onload = function() {
+            console.log('Image loaded');
+            
+            // 创建 pixelit 实例
+            const px = new pixelit({
+                to: document.getElementById('pixelitcanvas'),
+                from: document.getElementById('pixelitimg')
+            });
+
+            // 输出 endColorStats 的当前值
+            console.log('Initial endColorStats:', px.endColorStats);
+            
+            // 检查 getColorStats 方法是否存在
+            if (typeof px.getColorStats === 'function') {
+                console.log('getColorStats() result:', px.getColorStats());
+            } else {
+                console.log('getColorStats method does not exist or is commented out');
+            }
+
+            // 尝试直接访问 endColorStats 属性
+            console.log('Direct access to endColorStats:', px.endColorStats);
+
+            // 执行像素化过程
+            try {
+                px.draw()
+                  .pixelate()
+                  .convertPalette();
+                  
+                // 像素化完成后检查 endColorStats
+                console.log('After pixelation, endColorStats:', px.endColorStats);
+                
+                if (typeof px.getColorStats === 'function') {
+                    console.log('After pixelation, getColorStats() result:', px.getColorStats());
+                }
+            } catch (error) {
+                console.error('Error during pixelation:', error);
+            }
+        };
+        
+        // 处理图像加载错误
+        img.onerror = function() {
+            console.error('Failed to load image');
+        };
+    </script>
+</body>
+</html>

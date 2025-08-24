@@ -1,6 +1,7 @@
 const webpack = require("webpack");
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const srcDir = path.join(__dirname, "..", "src");
 
 module.exports = {
@@ -9,6 +10,7 @@ module.exports = {
       options: path.join(srcDir, 'options.tsx'),
       background: path.join(srcDir, 'background.ts'),
       content_script: path.join(srcDir, 'content_script.tsx'),
+      sidepanel: path.join(srcDir, 'index.tsx'),
     },
     output: {
         path: path.join(__dirname, "../dist/js"),
@@ -29,6 +31,10 @@ module.exports = {
                 use: "ts-loader",
                 exclude: /node_modules/,
             },
+            {
+                test: /\.css$/i,
+                use: [MiniCssExtractPlugin.loader, "css-loader", "postcss-loader"],
+            },
         ],
     },
     resolve: {
@@ -36,8 +42,11 @@ module.exports = {
     },
     plugins: [
         new CopyPlugin({
-            patterns: [{ from: ".", to: "../", context: "public" }],
+            patterns: [{ from: "public", to: path.resolve(__dirname, "../dist") }],
             options: {},
+        }),
+        new MiniCssExtractPlugin({
+            filename: "../[name].css",
         }),
     ],
 };
