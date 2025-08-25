@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import FileUpload from "./components/FileUpload";
 import ImagePreview from "./components/ImagePreview";
 import PixelArtPreview from "./components/PixelArtPreview";
 import ColorPalette from "./components/ColorPalette";
+import { Button } from "./components/ui/button";
 import { PALETTE, ColorInfo } from "./lib/palette";
 import { FREE_PALETTE } from "./lib/freePalette";
 
@@ -44,6 +44,7 @@ const SidePanel = () => {
   const [pixelArtDataUrl, setPixelArtDataUrl] = useState<string | null>(null);
   const [isPlacingOverlay, setIsPlacingOverlay] = useState(false);
   const [isPixelitLoaded, setIsPixelitLoaded] = useState(false);
+  const [pixelScale, setPixelScale] = useState<number>(8); // Default scale value
   // Remove isConverting state variable
   
   // Refs for DOM elements
@@ -366,7 +367,7 @@ const SidePanel = () => {
         from: imageRef.current,
         to: canvasRef.current,
         palette: selectedPalette,
-        scale: 8, // TODO: Make configurable
+        scale: pixelScale, // Use the pixelScale state
         maxHeight: 100, // TODO: Make configurable
         maxWidth: 100  // TODO: Make configurable
       });
@@ -446,22 +447,28 @@ const SidePanel = () => {
       />
       <canvas ref={canvasRef} className="hidden" />
       
-      {!selectedFile ? (
-        <FileUpload onFileSelect={handleFileSelect} />
-      ) : (
+      {
         <div className="flex-1 overflow-y-auto">
-          {pixelArtDataUrl && (
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-2">Pixel Art Preview</h2>
-              <div className="flex justify-center">
-                <img 
-                  src={pixelArtDataUrl} 
-                  alt="Pixel Art Preview" 
-                  className="max-h-[calc(100vh-220px)] w-auto object-contain"
-                />
-              </div>
-            </div>
-          )}
+          <PixelArtPreview 
+            pixelArtDataUrl={pixelArtDataUrl}
+            pixelScale={pixelScale}
+            onScaleChange={(scale) => {
+              setPixelScale(scale);
+              // Reconvert the image when scale changes
+              if (selectedFile && imageSrc && isPixelitLoaded) {
+                setTimeout(() => {
+                  convertImage();
+                }, 0);
+              }
+            }}
+            onFileSelect={handleFileSelect}
+            onReupload={() => {
+              // Reset the file selection to allow re-uploading the same file
+              setSelectedFile(null);
+              setImageSrc(null);
+              setPixelArtDataUrl(null);
+            }}
+          />
           
           {/* Color Palette */}
           <div>
@@ -475,7 +482,7 @@ const SidePanel = () => {
             />
           </div>
         </div>
-      )}
+      }
     </div>
   );
 };

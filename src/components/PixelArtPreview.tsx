@@ -1,55 +1,133 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface PixelArtPreviewProps {
   pixelArtDataUrl: string | null;
-  colorCounts: Map<string, number>;
-  getColorName: (rgbValue: string) => string;
+  pixelScale: number;
+  onScaleChange: (scale: number) => void;
+  onFileSelect: (file: File) => void;
+  onReupload?: () => void;
 }
 
 const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({ 
   pixelArtDataUrl, 
-  colorCounts,
-  getColorName
+  pixelScale,
+  onScaleChange,
+  onFileSelect,
+  onReupload
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+      
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        onFileSelect(files[0]);
+      }
+    },
+    [onFileSelect]
+  );
+
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        onFileSelect(files[0]);
+      }
+    },
+    [onFileSelect]
+  );
+
   if (!pixelArtDataUrl) {
     return (
       <div className="mt-4 p-2 bg-white rounded-lg shadow">
         <h2 className="text-lg font-semibold mb-2">Pixel Art Preview</h2>
-        <p className="text-gray-500">No pixel art generated yet.</p>
+        <div
+          className={cn(
+            "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors w-full",
+            isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => document.getElementById("fileInput")?.click()}
+        >
+          <input
+            id="fileInput"
+            type="file"
+            className="hidden"
+            accept="image/*"
+            onChange={handleFileInput}
+          />
+          <p className="text-gray-600">
+            {isDragging
+              ? "Drop the image here ..."
+              : "Drag & drop an image here, or click to select one"}
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Convert Map to array for rendering
-  const colorCountArray = Array.from(colorCounts.entries());
-
   return (
     <div className="mt-4 p-2 bg-white rounded-lg shadow">
       <h2 className="text-lg font-semibold mb-2">Pixel Art Preview</h2>
+      
+      {/* Pixel Scale Slider */}
+      <div className="mb-4 p-2 bg-gray-50 rounded-lg">
+        <div className="flex justify-between items-center mb-1">
+          <label htmlFor="pixelScale" className="text-sm font-medium text-gray-700">
+            Pixel Scale
+          </label>
+          <span className="text-sm font-medium text-gray-900 bg-white px-2 py-0.5 rounded border inline-flex items-center justify-center" style={{ minWidth: '30px', height: '24px' }}>{pixelScale}</span>
+        </div>
+        <Slider
+          id="pixelScale"
+          min={1}
+          max={50}
+          step={1}
+          value={[pixelScale]}
+          onValueChange={(value: number[]) => onScaleChange(value[0])}
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+          <span>Fine</span>
+          <span>Coarse</span>
+        </div>
+      </div>
+      
       <div className="flex justify-center mb-4">
         <img 
           src={pixelArtDataUrl} 
           alt="Pixel Art Preview" 
-          className="max-h-40 w-auto object-contain"
+          className="max-h-80 max-w-full w-auto h-auto object-contain border rounded"
         />
       </div>
       
-      <h3 className="text-md font-medium mb-1">Color Usage:</h3>
-      <div className="flex flex-wrap gap-2">
-        {colorCountArray.map(([colorRgb, count]) => {
-          // Only show colors that were used
-          if (count === 0) return null;
-          
-          return (
-            <div key={colorRgb} className="flex items-center gap-1">
-              <div 
-                className="w-4 h-4 rounded-sm border border-gray-300" 
-                style={{ backgroundColor: colorRgb }}
-              />
-              <span className="text-xs">{getColorName(colorRgb)}: {count}</span>
-            </div>
-          );
-        })}
+      {/* Re-upload button */}
+      <div className="flex justify-center">
+        <Button 
+          onClick={onReupload} 
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+          variant="default"
+          size="default"
+        >
+          Upload New Image
+        </Button>
       </div>
     </div>
   );

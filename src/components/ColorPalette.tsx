@@ -109,7 +109,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
         <div className="flex gap-2">
           <button 
             onClick={areAllSelected ? onDeselectAll : onSelectAll}
-            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm transition-colors flex items-center"
+            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-sm transition-colors flex items-center shadow-sm"
             style={{ 
               border: '1px solid #d1d5db',
               borderRadius: '0.25rem',
@@ -132,7 +132,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
           </button>
           <button 
             onClick={onRefreshPalette}
-            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm transition-colors flex items-center"
+            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-sm transition-colors flex items-center shadow-sm"
             style={{ 
               border: '1px solid #d1d5db',
               borderRadius: '0.25rem',

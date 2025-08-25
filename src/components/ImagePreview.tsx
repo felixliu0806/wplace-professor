@@ -12,7 +12,7 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ src, alt, className }) => {
       <img 
         src={src} 
         alt={alt} 
-        className={`max-h-40 w-auto object-contain ${className || ""}`} 
+        className={`max-h-80 max-w-full w-auto h-auto object-contain ${className || ""}`} 
       />
     </div>
   );
