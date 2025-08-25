@@ -103,14 +103,14 @@ const SidePanel = () => {
 
   const loadPixelitLibrary = () => {
     // Check if Pixelit is already available
-    if (typeof window !== 'undefined' && (window as any).pixelit) {
+    if (typeof window !== 'undefined' && (window as any).Pixelit) {
       setIsPixelitLoaded(true);
       return;
     }
 
     // Create script element
     const script = document.createElement('script');
-    script.src = 'pixelit.js';  // Use pixelit.js instead of pixelit.min.js
+    script.src = 'pixelit.min.js';
     script.async = true;
     script.onload = () => {
       console.log('Pixelit library loaded');
@@ -384,35 +384,9 @@ const SidePanel = () => {
       px.draw()
         .pixelate()
         .convertPalette();
-      
+
       // 获取颜色统计信息
-      // 使用 Canvas API 直接获取颜色统计信息
-      const colorCount = new Map<string, number>();
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) {
-          const w = canvasRef.current.width;
-          const h = canvasRef.current.height;
-          const imgPixels = ctx.getImageData(0, 0, w, h);
-          
-          for (let y = 0; y < imgPixels.height; y++) {
-            for (let x = 0; x < imgPixels.width; x++) {
-              const i = y * 4 * imgPixels.width + x * 4;
-              const r = imgPixels.data[i];
-              const g = imgPixels.data[i + 1];
-              const b = imgPixels.data[i + 2];
-              const a = imgPixels.data[i + 3];
-              
-              // Skip transparent pixels
-              if (a === 0) continue;
-              
-              const color = `rgb(${r},${g},${b})`;
-              const currentCount = colorCount.get(color) || 0;
-              colorCount.set(color, currentCount + 1);
-            }
-          }
-        }
-      }
+      const colorCount = px.getColorCount();
         
       // 确保在获取数据 URL 之前画布已更新
       // 使用 requestAnimationFrame 确保浏览器完成渲染
@@ -440,38 +414,7 @@ const SidePanel = () => {
     }
   };
 
-  const handlePlaceOverlay = () => {
-    if (!pixelArtDataUrl) return;
-    
-    setIsPlacingOverlay(true);
-    
-    // 从window对象获取颜色统计信息
-    const colorCounts = (window as any).pixelArtColorCounts || {};
-    
-    // Send message to content script to prepare for overlay placement
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      if (activeTab && activeTab.id) {
-        chrome.tabs.sendMessage(
-          activeTab.id,
-          { 
-            action: "prepareForOverlayPlacement",
-            pixelArtDataUrl: pixelArtDataUrl,
-            colorCounts: colorCounts
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.error("Error preparing for overlay placement:", chrome.runtime.lastError.message || chrome.runtime.lastError);
-              setIsPlacingOverlay(false);
-              return;
-            }
-            
-            console.log("Content script is ready for overlay placement");
-          }
-        );
-      }
-    });
-  };
+  const handlePlaceOverlay = () => {\n    if (!pixelArtDataUrl) return;\n    \n    setIsPlacingOverlay(true);\n    \n    // 从window对象获取颜色统计信息\n    const colorCounts = (window as any).pixelArtColorCounts || {};\n    \n    // Send message to content script to prepare for overlay placement\n    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {\n      const activeTab = tabs[0];\n      if (activeTab && activeTab.id) {\n        chrome.tabs.sendMessage(\n          activeTab.id,\n          { \n            action: \"prepareForOverlayPlacement\",\n            pixelArtDataUrl: pixelArtDataUrl,\n            colorCounts: colorCounts\n          },\n          (response) => {\n            if (chrome.runtime.lastError) {\n              console.error(\"Error preparing for overlay placement:\", chrome.runtime.lastError.message || chrome.runtime.lastError);\n              setIsPlacingOverlay(false);\n              return;\n            }\n            \n            console.log(\"Content script is ready for overlay placement\");\n          }\n        );\n      }\n    });\n  };
 
   // Helper function to get color name from RGB value
   const getColorName = (rgbValue: string): string => {
@@ -511,7 +454,6 @@ const SidePanel = () => {
               setImageSrc(null);
               setPixelArtDataUrl(null);
             }}
-            onPlaceOverlay={handlePlaceOverlay} // Add this new prop
           />
           
           {/* Color Palette */}

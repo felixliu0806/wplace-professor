@@ -40,7 +40,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["pixelit.min.js"],
+      "resources": ["pixelit.js", "pixelit.min.js"],
       "matches": ["https://wplace.live/*"]
     }
   ]

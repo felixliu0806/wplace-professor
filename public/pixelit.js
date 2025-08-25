@@ -394,5 +394,35 @@ class pixelit {
     document.querySelector("body").removeChild(link);
   }
 
+  /**
+   * Get color count stats for the image
+   * @returns {Map} Map of color strings to their counts
+   */
+  getColorCount() {
+    const w = this.drawto.width;
+    const h = this.drawto.height;
+    const imgPixels = this.ctx.getImageData(0, 0, w, h);
+    const colorCount = new Map();
+    
+    for (let y = 0; y < imgPixels.height; y++) {
+      for (let x = 0; x < imgPixels.width; x++) {
+        const i = y * 4 * imgPixels.width + x * 4;
+        const r = imgPixels.data[i];
+        const g = imgPixels.data[i + 1];
+        const b = imgPixels.data[i + 2];
+        const a = imgPixels.data[i + 3];
+        
+        // Skip transparent pixels
+        if (a === 0) continue;
+        
+        const color = `rgb(${r},${g},${b})`;
+        const currentCount = colorCount.get(color) || 0;
+        colorCount.set(color, currentCount + 1);
+      }
+    }
+    
+    return colorCount;
+  }
+
   //end class
 }

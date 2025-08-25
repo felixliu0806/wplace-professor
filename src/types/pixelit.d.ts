@@ -41,6 +41,12 @@ declare class Pixelit {
    * Get the output canvas element
    */
   getCanvas(): HTMLCanvasElement;
+
+  /**
+   * Get the color count map
+   * @returns Map<colorString, count>
+   */
+  getColorCount(): Map<string, number>;
 }
 
 export default Pixelit;

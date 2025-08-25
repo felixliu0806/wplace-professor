@@ -100,7 +100,7 @@ const detectAvailableColors = (): string[] => {
 };
 
 // Function to create and place the overlay
-const placeOverlay = (dataUrl: string, clickX: number, clickY: number) => {
+const placeOverlay = (dataUrl: string) => {
   // Remove existing overlay if any
   if (overlayElement) {
     overlayElement.remove();
@@ -109,119 +109,250 @@ const placeOverlay = (dataUrl: string, clickX: number, clickY: number) => {
   // Create overlay container
   overlayElement = document.createElement('div');
   overlayElement.id = 'wplace-professor-overlay';
-  overlayElement.style.position = 'absolute';
-  overlayElement.style.left = '0';
-  overlayElement.style.top = '0';
-  overlayElement.style.pointerEvents = 'none'; // So it doesn't interfere with clicks
+  overlayElement.style.position = 'fixed';
+  overlayElement.style.left = '50%';
+  overlayElement.style.top = '50%';
+  overlayElement.style.transform = 'translate(-50%, -50%)';
   overlayElement.style.zIndex = '99999';
-  overlayElement.style.width = '100%';
-  overlayElement.style.height = '100%';
+  overlayElement.style.cursor = 'move';
+  overlayElement.style.userSelect = 'none';
+  overlayElement.style.pointerEvents = 'none'; // Allow clicks to pass through to the canvas below
   
-  // Create image element for the pixel art
-  const img = document.createElement('img');
-  img.src = dataUrl;
-  img.style.position = 'absolute';
-  img.style.left = `${clickX}px`;
-  img.style.top = `${clickY}px`;
-  img.style.transform = 'translate(-50%, -50%)'; // Center the image on the click point
-  img.style.pointerEvents = 'none';
-  img.style.maxWidth = '200px'; // Limit size
-  img.style.maxHeight = '200px';
+  // Create header for dragging and closing (positioned absolutely)
+  const header = document.createElement('div');
+  header.style.position = 'absolute';
+  header.style.top = '-30px';
+  header.style.right = '0';
+  header.style.display = 'flex';
+  header.style.gap = '5px';
+  header.style.pointerEvents = 'auto'; // Enable pointer events for controls
   
-  overlayElement.appendChild(img);
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.textContent = '-';
+  zoomOutBtn.style.background = 'rgba(255, 255, 255, 0.8)';
+  zoomOutBtn.style.border = '1px solid #ccc';
+  zoomOutBtn.style.borderRadius = '3px';
+  zoomOutBtn.style.cursor = 'pointer';
+  zoomOutBtn.style.width = '24px';
+  zoomOutBtn.style.height = '24px';
+  zoomOutBtn.style.display = 'flex';
+  zoomOutBtn.style.alignItems = 'center';
+  zoomOutBtn.style.justifyContent = 'center';
+  zoomOutBtn.style.fontSize = '16px';
+  zoomOutBtn.style.padding = '0';
+  
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.textContent = '+';
+  zoomInBtn.style.background = 'rgba(255, 255, 255, 0.8)';
+  zoomInBtn.style.border = '1px solid #ccc';
+  zoomInBtn.style.borderRadius = '3px';
+  zoomInBtn.style.cursor = 'pointer';
+  zoomInBtn.style.width = '24px';
+  zoomInBtn.style.height = '24px';
+  zoomInBtn.style.display = 'flex';
+  zoomInBtn.style.alignItems = 'center';
+  zoomInBtn.style.justifyContent = 'center';
+  zoomInBtn.style.fontSize = '16px';
+  zoomInBtn.style.padding = '0';
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '×';
+  closeBtn.style.background = 'rgba(255, 255, 255, 0.8)';
+  closeBtn.style.border = '1px solid #ccc';
+  closeBtn.style.borderRadius = '3px';
+  closeBtn.style.cursor = 'pointer';
+  closeBtn.style.width = '24px';
+  closeBtn.style.height = '24px';
+  closeBtn.style.display = 'flex';
+  closeBtn.style.alignItems = 'center';
+  closeBtn.style.justifyContent = 'center';
+  closeBtn.style.fontSize = '16px';
+  closeBtn.style.padding = '0';
+  
+  header.appendChild(zoomOutBtn);
+  header.appendChild(zoomInBtn);
+  header.appendChild(closeBtn);
+  
+  // Create canvas for the pixel art
+  const canvas = document.createElement('canvas');
+  canvas.style.imageRendering = 'pixelated'; // For sharp pixel edges
+  canvas.style.opacity = '0.7'; // Set transparency
+  canvas.style.pointerEvents = 'none'; // Allow clicks to pass through to the canvas below
+  
+  overlayElement.appendChild(header);
+  overlayElement.appendChild(canvas);
   document.body.appendChild(overlayElement);
   
-  console.log('Overlay placed at', clickX, clickY);
-};
-
-// Function to remove the overlay
-const removeOverlay = () => {
-  if (overlayElement) {
-    overlayElement.remove();
-    overlayElement = null;
-  }
-  if (colorPanelElement) {
-    colorPanelElement.remove();
-    colorPanelElement = null;
-  }
-};
-
-// Function to create and show the color panel
-const showColorPanel = (counts: { [color: string]: number }) => {
-  // Remove existing panel if any
-  if (colorPanelElement) {
-    colorPanelElement.remove();
-  }
-
-  // Create color panel container
-  colorPanelElement = document.createElement('div');
-  colorPanelElement.id = 'wplace-professor-color-panel';
-  colorPanelElement.style.position = 'fixed';
-  colorPanelElement.style.bottom = '20px';
-  colorPanelElement.style.right = '20px';
-  colorPanelElement.style.backgroundColor = 'white';
-  colorPanelElement.style.border = '1px solid #ccc';
-  colorPanelElement.style.borderRadius = '8px';
-  colorPanelElement.style.padding = '10px';
-  colorPanelElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-  colorPanelElement.style.zIndex = '100000';
-  colorPanelElement.style.maxHeight = '300px';
-  colorPanelElement.style.overflowY = 'auto';
-  
-  // Create title
-  const title = document.createElement('h3');
-  title.textContent = 'Used Colors';
-  title.style.marginTop = '0';
-  colorPanelElement.appendChild(title);
-  
-  // Create color list
-  const colorList = document.createElement('div');
-  colorList.style.display = 'flex';
-  colorList.style.flexDirection = 'column';
-  colorList.style.gap = '5px';
-  
-  for (const [color, count] of Object.entries(counts)) {
-    if (count > 0) { // Only show colors that are used
-      const colorItem = document.createElement('div');
-      colorItem.style.display = 'flex';
-      colorItem.style.alignItems = 'center';
-      colorItem.style.gap = '5px';
+  // Load image and draw it on canvas with pixel borders
+  const img = new Image();
+  img.onload = function() {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // Set initial scale - 1:1 pixel ratio by default
+      let scale = 1;
       
-      const colorBox = document.createElement('div');
-      colorBox.style.width = '20px';
-      colorBox.style.height = '20px';
-      colorBox.style.backgroundColor = color;
-      colorBox.style.border = '1px solid #ccc';
-      colorBox.style.borderRadius = '4px';
+      // Set canvas size
+      canvas.width = img.naturalWidth * scale;
+      canvas.height = img.naturalHeight * scale;
       
-      const colorText = document.createElement('span');
-      colorText.textContent = `${color}: ${count}`;
-      colorText.style.fontSize = '14px';
+      // Draw image with pixel borders
+      drawPixelArtWithBorders(ctx, img, scale);
       
-      colorItem.appendChild(colorBox);
-      colorItem.appendChild(colorText);
-      colorList.appendChild(colorItem);
+      // Set up zoom controls
+      let currentScale = scale;
+      
+      zoomInBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent dragging
+        currentScale = Math.min(currentScale + 1, 20);
+        redrawCanvasWithBorders(canvas, ctx, img, currentScale);
+      });
+      
+      zoomOutBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent dragging
+        currentScale = Math.max(currentScale - 1, 1);
+        redrawCanvasWithBorders(canvas, ctx, img, currentScale);
+      });
+    }
+  };
+  img.src = dataUrl;
+  
+  // Close button event
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    if (overlayElement) {
+      overlayElement.remove();
+      overlayElement = null;
+    }
+  });
+  
+  // Make the overlay draggable
+  let isDragging = false;
+  let currentX: number;
+  let currentY: number;
+  let initialX: number;
+  let initialY: number;
+  let xOffset = 0;
+  let yOffset = 0;
+  
+  overlayElement.addEventListener('mousedown', dragStart);
+  overlayElement.addEventListener('touchstart', dragStart);
+  
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('touchmove', drag);
+  
+  document.addEventListener('mouseup', dragEnd);
+  document.addEventListener('touchend', dragEnd);
+  
+  function dragStart(e: MouseEvent | TouchEvent) {
+    // Only drag when clicking on the overlay itself, not on controls
+    if (e.target === overlayElement || e.target === canvas) {
+      if (e.type === 'touchstart') {
+        initialX = (e as TouchEvent).touches[0].clientX - xOffset;
+        initialY = (e as TouchEvent).touches[0].clientY - yOffset;
+      } else {
+        initialX = (e as MouseEvent).clientX - xOffset;
+        initialY = (e as MouseEvent).clientY - yOffset;
+      }
+      
+      isDragging = true;
     }
   }
   
-  colorPanelElement.appendChild(colorList);
-  document.body.appendChild(colorPanelElement);
+  function drag(e: MouseEvent | TouchEvent) {
+    if (isDragging) {
+      e.preventDefault();
+      
+      if (e.type === 'touchmove') {
+        currentX = (e as TouchEvent).touches[0].clientX - initialX;
+        currentY = (e as TouchEvent).touches[0].clientY - initialY;
+      } else {
+        currentX = (e as MouseEvent).clientX - initialX;
+        currentY = (e as MouseEvent).clientY - initialY;
+      }
+      
+      xOffset = currentX;
+      yOffset = currentY;
+      
+      if (overlayElement) {
+        setTranslate(currentX, currentY, overlayElement);
+      }
+    }
+  }
+  
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+    
+    isDragging = false;
+  }
+  
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    if (el) {
+      el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+    }
+  }
+  
+  console.log('Overlay placed at center of screen');
+};
+
+// Function to draw pixel art with borders
+const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number) => {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+  // Create a temporary canvas to get image data
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) return;
+  
+  tempCanvas.width = img.naturalWidth;
+  tempCanvas.height = img.naturalHeight;
+  tempCtx.drawImage(img, 0, 0);
+  
+  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const data = imageData.data;
+  
+  // Draw each pixel with borders
+  for (let y = 0; y < tempCanvas.height; y++) {
+    for (let x = 0; x < tempCanvas.width; x++) {
+      const i = (y * tempCanvas.width + x) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Skip transparent pixels
+      if (a === 0) continue;
+      
+      const pixelX = x * scale;
+      const pixelY = y * scale;
+      
+      // Draw pixel fill
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(pixelX, pixelY, scale, scale);
+      
+      // Draw pixel border (black border)
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pixelX, pixelY, scale, scale);
+    }
+  }
+};
+
+// Function to redraw canvas with new scale
+const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number) => {
+  // Set canvas size
+  canvas.width = img.naturalWidth * scale;
+  canvas.height = img.naturalHeight * scale;
+  
+  // Draw image with pixel borders
+  drawPixelArtWithBorders(ctx, img, scale);
 };
 
 // Set up click listener for overlay placement
 const setupOverlayPlacement = () => {
-  const handleClick = (event: MouseEvent) => {
-    if (pixelArtDataUrl) {
-      placeOverlay(pixelArtDataUrl, event.clientX, event.clientY);
-      showColorPanel(colorCounts);
-      // Remove the listener after placing the overlay
-      document.removeEventListener('click', handleClick);
-    }
-  };
-
-  document.addEventListener('click', handleClick);
-  
-  console.log("Click on the page to place the overlay");
+  if (pixelArtDataUrl) {
+    placeOverlay(pixelArtDataUrl);
+  }
 };
 
 // Listen for messages from the SidePanel
@@ -296,3 +427,15 @@ window.addEventListener('beforeunload', () => {
   console.log('Page unloading, cleaning up');
   // Clean up any resources if needed
 });
+
+// Function to remove the overlay
+const removeOverlay = () => {
+  if (overlayElement) {
+    overlayElement.remove();
+    overlayElement = null;
+  }
+  
+  // Remove any existing highlights
+  const existingHighlights = document.querySelectorAll('.wplace-pixel-highlight, .wplace-pixel-highlight-container');
+  existingHighlights.forEach(el => el.remove());
+};

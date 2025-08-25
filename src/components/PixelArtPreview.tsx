@@ -9,6 +9,7 @@ interface PixelArtPreviewProps {
   onScaleChange: (scale: number) => void;
   onFileSelect: (file: File) => void;
   onReupload?: () => void;
+  onPlaceOverlay?: () => void;
 }
 
 const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({ 
@@ -16,7 +17,8 @@ const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({
   pixelScale,
   onScaleChange,
   onFileSelect,
-  onReupload
+  onReupload,
+  onPlaceOverlay
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -118,16 +120,28 @@ const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({
         />
       </div>
       
-      {/* Re-upload button */}
-      <div className="flex justify-center">
+      {/* Action buttons */}
+      <div className="flex justify-center gap-2">
         <Button 
           onClick={onReupload} 
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
           variant="default"
           size="default"
         >
           Upload New Image
         </Button>
+        
+        {/* Place Overlay button */}
+        {onPlaceOverlay && (
+          <Button 
+            onClick={onPlaceOverlay} 
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+            variant="default"
+            size="default"
+          >
+            Place Overlay
+          </Button>
+        )}
       </div>
     </div>
   );
