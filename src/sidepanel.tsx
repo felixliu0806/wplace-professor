@@ -457,7 +457,8 @@ const SidePanel = () => {
           { 
             action: "prepareForOverlayPlacement",
             pixelArtDataUrl: pixelArtDataUrl,
-            colorCounts: colorCounts
+            colorCounts: colorCounts,
+            pixelScale: pixelScale  // Add pixelScale to the message
           },
           (response) => {
             if (chrome.runtime.lastError) {

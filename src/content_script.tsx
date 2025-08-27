@@ -188,15 +188,20 @@ const placeOverlay = (dataUrl: string) => {
   img.onload = function() {
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Set initial scale - 1:1 pixel ratio by default
+      // Use scale = 1 for default image size
       let scale = 1;
+      
+      // Calculate gridScale for drawing grid lines
+      const pixelScale = (window as any).currentPixelScale || 1;
+      const gridScale = Math.floor(100 / pixelScale);
+      console.log("Using pixelScale:", pixelScale, "and gridScale:", gridScale);
       
       // Set canvas size
       canvas.width = img.naturalWidth * scale;
       canvas.height = img.naturalHeight * scale;
       
       // Draw image with pixel borders
-      drawPixelArtWithBorders(ctx, img, scale);
+      drawPixelArtWithBorders(ctx, img, scale, gridScale);
       
       // Set up zoom controls
       let currentScale = scale;
@@ -204,13 +209,15 @@ const placeOverlay = (dataUrl: string) => {
       zoomInBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent dragging
         currentScale = Math.min(currentScale + 1, 20);
-        redrawCanvasWithBorders(canvas, ctx, img, currentScale);
+        console.log(`Zoom in clicked, new scale: ${currentScale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * currentScale}`);
+        redrawCanvasWithBorders(canvas, ctx, img, currentScale, gridScale);
       });
       
       zoomOutBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent dragging
         currentScale = Math.max(currentScale - 1, 1);
-        redrawCanvasWithBorders(canvas, ctx, img, currentScale);
+        console.log(`Zoom out clicked, new scale: ${currentScale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * currentScale}`);
+        redrawCanvasWithBorders(canvas, ctx, img, currentScale, gridScale);
       });
     }
   };
@@ -296,7 +303,9 @@ const placeOverlay = (dataUrl: string) => {
 };
 
 // Function to draw pixel art with borders
-const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number) => {
+const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
+  console.log(`drawPixelArtWithBorders called with scale: ${scale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * scale}`);
+  
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   
   // Create a temporary canvas to get image data
@@ -311,7 +320,7 @@ const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageEl
   const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
   const data = imageData.data;
   
-  // Draw each pixel with borders
+  // Draw each pixel
   for (let y = 0; y < tempCanvas.height; y++) {
     for (let x = 0; x < tempCanvas.width; x++) {
       const i = (y * tempCanvas.width + x) * 4;
@@ -329,23 +338,46 @@ const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageEl
       // Draw pixel fill
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(pixelX, pixelY, scale, scale);
-      
-      // Draw pixel border (black border)
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(pixelX, pixelY, scale, scale);
     }
   }
+  
+  // Draw grid lines for pixel blocks (gridScale x gridScale)
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1;
+  
+  // Calculate the dimensions of the scaled image
+  const scaledWidth = tempCanvas.width * scale;
+  const scaledHeight = tempCanvas.height * scale;
+  
+  console.log(`Canvas size: ${scaledWidth} x ${scaledHeight}`);
+  
+  // Vertical lines - draw a line every 'gridScale' pixels in the scaled image
+  for (let x = 0; x <= scaledWidth; x += gridScale * scale) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, scaledHeight);
+    ctx.stroke();
+  }
+  
+  // Horizontal lines - draw a line every 'gridScale' pixels in the scaled image
+  for (let y = 0; y <= scaledHeight; y += gridScale * scale) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(scaledWidth, y);
+    ctx.stroke();
+  }
+  
+  console.log(`Finished drawing with scale: ${scale}, gridScale: ${gridScale}`);
 };
 
 // Function to redraw canvas with new scale
-const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number) => {
+const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
   // Set canvas size
   canvas.width = img.naturalWidth * scale;
   canvas.height = img.naturalHeight * scale;
   
   // Draw image with pixel borders
-  drawPixelArtWithBorders(ctx, img, scale);
+  drawPixelArtWithBorders(ctx, img, scale, gridScale);
 };
 
 // Set up click listener for overlay placement
@@ -369,9 +401,12 @@ const setupMessageListener = () => {
       const colors = detectAvailableColors();
       sendResponse({ availableColors: colors });
     } else if (request.action === "prepareForOverlayPlacement") {
+      console.log("Received prepareForOverlayPlacement message with pixelScale:", request.pixelScale);
       if (request.pixelArtDataUrl && request.colorCounts) {
         pixelArtDataUrl = request.pixelArtDataUrl;
         colorCounts = request.colorCounts;
+        // Store the pixelScale for use in drawing functions
+        (window as any).currentPixelScale = request.pixelScale || 1;
         setupOverlayPlacement();
         sendResponse({ status: "Ready for overlay placement" });
       } else {
