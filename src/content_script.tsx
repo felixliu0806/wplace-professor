@@ -166,8 +166,8 @@ const placeOverlay = (dataUrl: string) => {
   overlayElement = document.createElement('div');
   overlayElement.id = 'wplace-professor-overlay';
   overlayElement.style.position = 'fixed';
-  overlayElement.style.left = '0px';
-  overlayElement.style.top = '0px';
+  overlayElement.style.left = '100px';
+  overlayElement.style.top = '100px';
   overlayElement.style.transform = 'translate(0px, 0px)';
   overlayElement.style.zIndex = '99998';
   overlayElement.style.cursor = 'move';
