@@ -1,5 +1,6 @@
 // State for the overlay and color panel
 let overlayElement: HTMLDivElement | null = null;
+let controlPanelElement: HTMLDivElement | null = null;
 let colorPanelElement: HTMLDivElement | null = null;
 let pixelArtDataUrl: string | null = null;
 let colorCounts: { [color: string]: number } = {};
@@ -99,136 +100,294 @@ const detectAvailableColors = (): string[] => {
   }
 };
 
+// Function to redraw grid pattern with new scale
+const redrawGridPattern = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, gridSize: number, cellSize: number) => {
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Update canvas size with precise dimensions
+  canvas.width = Math.max(1, Math.round(gridSize * cellSize));
+  canvas.height = Math.max(1, Math.round(gridSize * cellSize));
+  
+  // Set image smoothing for better quality
+  ctx.imageSmoothingEnabled = false; // Keep pixelated look
+  
+  // Redraw grid pattern with smooth scaling
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      // Create a checkerboard pattern with lighter colors and higher transparency
+      const color = (x + y) % 2 === 0 ? 'rgba(255, 150, 150, 0.4)' : 'rgba(150, 150, 255, 0.4)'; // Even lighter colors with 40% opacity
+      ctx.fillStyle = color;
+      
+      // Calculate precise positions and dimensions using floating point arithmetic
+      const xPos = x * cellSize;
+      const yPos = y * cellSize;
+      const width = cellSize;
+      const height = cellSize;
+      
+      ctx.fillRect(xPos, yPos, width, height);
+    }
+  }
+  
+  // Redraw grid lines with subpixel precision
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'; // Lighter grid lines with transparency
+  ctx.lineWidth = 1;
+  
+  // Vertical lines
+  for (let x = 0; x <= gridSize; x++) {
+    const xPos = x * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(xPos, 0);
+    ctx.lineTo(xPos, gridSize * cellSize);
+    ctx.stroke();
+  }
+  
+  // Horizontal lines
+  for (let y = 0; y <= gridSize; y++) {
+    const yPos = y * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(0, yPos);
+    ctx.lineTo(gridSize * cellSize, yPos);
+    ctx.stroke();
+  }
+};
+
 // Function to create and place the overlay
 const placeOverlay = (dataUrl: string) => {
-  // Remove existing overlay if any
+  // Remove existing overlay and control panel if any
   if (overlayElement) {
     overlayElement.remove();
+  }
+  if (controlPanelElement) {
+    controlPanelElement.remove();
   }
 
   // Create overlay container
   overlayElement = document.createElement('div');
   overlayElement.id = 'wplace-professor-overlay';
   overlayElement.style.position = 'fixed';
-  overlayElement.style.left = '50%';
-  overlayElement.style.top = '50%';
-  overlayElement.style.transform = 'translate(-50%, -50%)';
-  overlayElement.style.zIndex = '99999';
+  overlayElement.style.left = '0px';
+  overlayElement.style.top = '0px';
+  overlayElement.style.transform = 'translate(0px, 0px)';
+  overlayElement.style.zIndex = '99998';
   overlayElement.style.cursor = 'move';
   overlayElement.style.userSelect = 'none';
   overlayElement.style.pointerEvents = 'none'; // Allow clicks to pass through to the canvas below
   
-  // Create header for dragging and closing (positioned absolutely)
-  const header = document.createElement('div');
-  header.style.position = 'absolute';
-  header.style.top = '-30px';
-  header.style.right = '0';
-  header.style.display = 'flex';
-  header.style.gap = '5px';
-  header.style.pointerEvents = 'auto'; // Enable pointer events for controls
-  
-  const zoomOutBtn = document.createElement('button');
-  zoomOutBtn.textContent = '-';
-  zoomOutBtn.style.background = 'rgba(255, 255, 255, 0.8)';
-  zoomOutBtn.style.border = '1px solid #ccc';
-  zoomOutBtn.style.borderRadius = '3px';
-  zoomOutBtn.style.cursor = 'pointer';
-  zoomOutBtn.style.width = '24px';
-  zoomOutBtn.style.height = '24px';
-  zoomOutBtn.style.display = 'flex';
-  zoomOutBtn.style.alignItems = 'center';
-  zoomOutBtn.style.justifyContent = 'center';
-  zoomOutBtn.style.fontSize = '16px';
-  zoomOutBtn.style.padding = '0';
-  
-  const zoomInBtn = document.createElement('button');
-  zoomInBtn.textContent = '+';
-  zoomInBtn.style.background = 'rgba(255, 255, 255, 0.8)';
-  zoomInBtn.style.border = '1px solid #ccc';
-  zoomInBtn.style.borderRadius = '3px';
-  zoomInBtn.style.cursor = 'pointer';
-  zoomInBtn.style.width = '24px';
-  zoomInBtn.style.height = '24px';
-  zoomInBtn.style.display = 'flex';
-  zoomInBtn.style.alignItems = 'center';
-  zoomInBtn.style.justifyContent = 'center';
-  zoomInBtn.style.fontSize = '16px';
-  zoomInBtn.style.padding = '0';
-  
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '×';
-  closeBtn.style.background = 'rgba(255, 255, 255, 0.8)';
-  closeBtn.style.border = '1px solid #ccc';
-  closeBtn.style.borderRadius = '3px';
-  closeBtn.style.cursor = 'pointer';
-  closeBtn.style.width = '24px';
-  closeBtn.style.height = '24px';
-  closeBtn.style.display = 'flex';
-  closeBtn.style.alignItems = 'center';
-  closeBtn.style.justifyContent = 'center';
-  closeBtn.style.fontSize = '16px';
-  closeBtn.style.padding = '0';
-  
-  header.appendChild(zoomOutBtn);
-  header.appendChild(zoomInBtn);
-  header.appendChild(closeBtn);
-  
   // Create canvas for the pixel art
   const canvas = document.createElement('canvas');
   canvas.style.imageRendering = 'pixelated'; // For sharp pixel edges
-  canvas.style.opacity = '0.7'; // Set transparency
+  canvas.style.opacity = '0.9'; // Higher transparency
   canvas.style.pointerEvents = 'none'; // Allow clicks to pass through to the canvas below
   
-  overlayElement.appendChild(header);
   overlayElement.appendChild(canvas);
   document.body.appendChild(overlayElement);
   
-  // Load image and draw it on canvas with pixel borders
-  const img = new Image();
-  img.onload = function() {
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Use scale = 1 for default image size
-      let scale = 1;
-      
-      // Calculate gridScale for drawing grid lines
-      const pixelScale = (window as any).currentPixelScale || 1;
-      const gridScale = Math.floor(100 / pixelScale);
-      console.log("Using pixelScale:", pixelScale, "and gridScale:", gridScale);
-      
-      // Set canvas size
-      canvas.width = img.naturalWidth * scale;
-      canvas.height = img.naturalHeight * scale;
-      
-      // Draw image with pixel borders
-      drawPixelArtWithBorders(ctx, img, scale, gridScale);
-      
-      // Set up zoom controls
-      let currentScale = scale;
-      
-      zoomInBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent dragging
-        currentScale = Math.min(currentScale + 1, 20);
-        console.log(`Zoom in clicked, new scale: ${currentScale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * currentScale}`);
-        redrawCanvasWithBorders(canvas, ctx, img, currentScale, gridScale);
-      });
-      
-      zoomOutBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent dragging
-        currentScale = Math.max(currentScale - 1, 1);
-        console.log(`Zoom out clicked, new scale: ${currentScale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * currentScale}`);
-        redrawCanvasWithBorders(canvas, ctx, img, currentScale, gridScale);
-      });
+  // Create separate control panel
+  controlPanelElement = document.createElement('div');
+  controlPanelElement.id = 'wplace-professor-control-panel';
+  controlPanelElement.style.position = 'fixed';
+  controlPanelElement.style.top = '20px';
+  controlPanelElement.style.right = '20px';
+  controlPanelElement.style.zIndex = '99999';
+  controlPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  controlPanelElement.style.padding = '15px';
+  controlPanelElement.style.borderRadius = '8px';
+  controlPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  controlPanelElement.style.fontFamily = 'Arial, sans-serif';
+  controlPanelElement.style.minWidth = '200px';
+  
+  // Create control panel title
+  const title = document.createElement('h3');
+  title.textContent = 'Overlay Controls';
+  title.style.margin = '0 0 10px 0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  
+  // Create zoom slider
+  const zoomLabel = document.createElement('div');
+  zoomLabel.id = 'zoom-label';
+  zoomLabel.textContent = 'Zoom: 1.00x';
+  zoomLabel.style.fontSize = '14px';
+  zoomLabel.style.marginBottom = '5px';
+  zoomLabel.style.color = '#555';
+  
+  const zoomSlider = document.createElement('input');
+  zoomSlider.type = 'range';
+  zoomSlider.id = 'zoom-slider';
+  zoomSlider.min = '0.1';
+  zoomSlider.max = '5.0';
+  zoomSlider.step = '0.01';
+  zoomSlider.value = '1.0';
+  zoomSlider.style.width = '100%';
+  zoomSlider.style.marginBottom = '5px';
+  zoomSlider.style.cursor = 'pointer';
+  
+  // Create zoom buttons container
+  const zoomButtonsContainer = document.createElement('div');
+  zoomButtonsContainer.style.display = 'flex';
+  zoomButtonsContainer.style.gap = '5px';
+  zoomButtonsContainer.style.marginBottom = '10px';
+  
+  // Create zoom out button
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.textContent = '-';
+  zoomOutBtn.style.flex = '1';
+  zoomOutBtn.style.background = '#f0f0f0';
+  zoomOutBtn.style.border = '1px solid #ccc';
+  zoomOutBtn.style.borderRadius = '4px';
+  zoomOutBtn.style.padding = '5px';
+  zoomOutBtn.style.cursor = 'pointer';
+  zoomOutBtn.style.fontSize = '16px';
+  zoomOutBtn.style.fontWeight = 'bold';
+  
+  // Create zoom in button
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.textContent = '+';
+  zoomInBtn.style.flex = '1';
+  zoomInBtn.style.background = '#f0f0f0';
+  zoomInBtn.style.border = '1px solid #ccc';
+  zoomInBtn.style.borderRadius = '4px';
+  zoomInBtn.style.padding = '5px';
+  zoomInBtn.style.cursor = 'pointer';
+  zoomInBtn.style.fontSize = '16px';
+  zoomInBtn.style.fontWeight = 'bold';
+  
+  zoomButtonsContainer.appendChild(zoomOutBtn);
+  zoomButtonsContainer.appendChild(zoomInBtn);
+  
+  // Create mode toggle button
+  const modeToggleBtn = document.createElement('button');
+  modeToggleBtn.textContent = 'Enable Drag Mode';
+  modeToggleBtn.style.background = '#4CAF50';
+  modeToggleBtn.style.color = 'white';
+  modeToggleBtn.style.border = 'none';
+  modeToggleBtn.style.borderRadius = '4px';
+  modeToggleBtn.style.padding = '8px 12px';
+  modeToggleBtn.style.cursor = 'pointer';
+  modeToggleBtn.style.fontSize = '14px';
+  modeToggleBtn.style.width = '100%';
+  modeToggleBtn.style.marginBottom = '10px';
+  modeToggleBtn.style.fontWeight = 'bold';
+  
+  modeToggleBtn.addEventListener('mouseenter', () => {
+    modeToggleBtn.style.background = '#45a049';
+  });
+  
+  modeToggleBtn.addEventListener('mouseleave', () => {
+    modeToggleBtn.style.background = '#4CAF50';
+  });
+  
+  // Create close button
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Close Overlay';
+  closeBtn.style.background = '#ff4444';
+  closeBtn.style.color = 'white';
+  closeBtn.style.border = 'none';
+  closeBtn.style.borderRadius = '4px';
+  closeBtn.style.padding = '8px 12px';
+  closeBtn.style.cursor = 'pointer';
+  closeBtn.style.fontSize = '14px';
+  closeBtn.style.width = '100%';
+  closeBtn.style.fontWeight = 'bold';
+  
+  closeBtn.addEventListener('mouseenter', () => {
+    closeBtn.style.background = '#cc3333';
+  });
+  
+  closeBtn.addEventListener('mouseleave', () => {
+    closeBtn.style.background = '#ff4444';
+  });
+  
+  controlPanelElement.appendChild(title);
+  controlPanelElement.appendChild(zoomLabel);
+  controlPanelElement.appendChild(zoomSlider);
+  controlPanelElement.appendChild(zoomButtonsContainer);
+  controlPanelElement.appendChild(modeToggleBtn);
+  controlPanelElement.appendChild(closeBtn);
+  document.body.appendChild(controlPanelElement);
+  
+  // Create a grid pattern instead of using the image
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Set fixed dimensions for the grid (e.g., 16x16 pixels)
+    const gridSize = 16;
+    const baseCellSize = 20; // Base size of each cell in pixels
+    
+    // Initial drawing
+    redrawGridPattern(canvas, ctx, gridSize, baseCellSize * parseFloat(zoomSlider.value));
+    
+    // Set up smooth zoom control with slider
+    zoomSlider.addEventListener('input', (e) => {
+      const scale = parseFloat((e.target as HTMLInputElement).value);
+      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
+      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * scale);
+    });
+    
+    // Set up zoom buttons and slider
+    const zoomStep = 0.01; // Step for zoom in/out buttons
+    
+    // Function to perform zoom
+    const performZoom = (newScale: number) => {
+      // Update UI and redraw
+      zoomSlider.value = newScale.toString();
+      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
+      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * newScale);
+      // Position is handled by drag, so we don't need to adjust it here
+    };
+    
+    // Zoom in button
+    zoomInBtn.addEventListener('click', () => {
+      const currentScale = parseFloat(zoomSlider.value);
+      const newScale = Math.min(currentScale + zoomStep, 5.0);
+      performZoom(newScale);
+    });
+    
+    // Zoom out button
+    zoomOutBtn.addEventListener('click', () => {
+      const currentScale = parseFloat(zoomSlider.value);
+      const newScale = Math.max(currentScale - zoomStep, 0.1);
+      performZoom(newScale);
+    });
+    
+    // Slider input
+    zoomSlider.addEventListener('input', (e) => {
+      const scale = parseFloat((e.target as HTMLInputElement).value);
+      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
+      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * scale);
+    });
+  }
+  
+  // Mode toggle button event
+  let isDragMode = false;
+  modeToggleBtn.addEventListener('click', () => {
+    isDragMode = !isDragMode;
+    if (overlayElement) {
+      if (isDragMode) {
+        // Enable drag mode - allow interaction with overlay
+        overlayElement.style.pointerEvents = 'auto';
+        modeToggleBtn.textContent = 'Disable Drag Mode';
+        modeToggleBtn.style.background = '#ff9800';
+      } else {
+        // Disable drag mode - ignore overlay for clicks
+        overlayElement.style.pointerEvents = 'none';
+        modeToggleBtn.textContent = 'Enable Drag Mode';
+        modeToggleBtn.style.background = '#4CAF50';
+      }
     }
-  };
-  img.src = dataUrl;
+  });
   
   // Close button event
   closeBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevent dragging
+    e.stopPropagation();
     if (overlayElement) {
       overlayElement.remove();
       overlayElement = null;
+    }
+    if (controlPanelElement) {
+      controlPanelElement.remove();
+      controlPanelElement = null;
     }
   });
   
@@ -291,6 +450,9 @@ const placeOverlay = (dataUrl: string) => {
     initialY = currentY;
     
     isDragging = false;
+    
+    // Update base position after dragging
+    // updateBasePosition(); // This function is not defined in this scope
   }
   
   function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
@@ -299,92 +461,14 @@ const placeOverlay = (dataUrl: string) => {
     }
   }
   
-  console.log('Overlay placed at center of screen');
-};
-
-// Function to draw pixel art with borders
-const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
-  console.log(`drawPixelArtWithBorders called with scale: ${scale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * scale}`);
-  
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  
-  // Create a temporary canvas to get image data
-  const tempCanvas = document.createElement('canvas');
-  const tempCtx = tempCanvas.getContext('2d');
-  if (!tempCtx) return;
-  
-  tempCanvas.width = img.naturalWidth;
-  tempCanvas.height = img.naturalHeight;
-  tempCtx.drawImage(img, 0, 0);
-  
-  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-  const data = imageData.data;
-  
-  // Draw each pixel
-  for (let y = 0; y < tempCanvas.height; y++) {
-    for (let x = 0; x < tempCanvas.width; x++) {
-      const i = (y * tempCanvas.width + x) * 4;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-      
-      // Skip transparent pixels
-      if (a === 0) continue;
-      
-      const pixelX = x * scale;
-      const pixelY = y * scale;
-      
-      // Draw pixel fill
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(pixelX, pixelY, scale, scale);
-    }
-  }
-  
-  // Draw grid lines for pixel blocks (gridScale x gridScale)
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1;
-  
-  // Calculate the dimensions of the scaled image
-  const scaledWidth = tempCanvas.width * scale;
-  const scaledHeight = tempCanvas.height * scale;
-  
-  console.log(`Canvas size: ${scaledWidth} x ${scaledHeight}`);
-  
-  // Vertical lines - draw a line every 'gridScale' pixels in the scaled image
-  for (let x = 0; x <= scaledWidth; x += gridScale * scale) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, scaledHeight);
-    ctx.stroke();
-  }
-  
-  // Horizontal lines - draw a line every 'gridScale' pixels in the scaled image
-  for (let y = 0; y <= scaledHeight; y += gridScale * scale) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(scaledWidth, y);
-    ctx.stroke();
-  }
-  
-  console.log(`Finished drawing with scale: ${scale}, gridScale: ${gridScale}`);
-};
-
-// Function to redraw canvas with new scale
-const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
-  // Set canvas size
-  canvas.width = img.naturalWidth * scale;
-  canvas.height = img.naturalHeight * scale;
-  
-  // Draw image with pixel borders
-  drawPixelArtWithBorders(ctx, img, scale, gridScale);
+  console.log('Overlay placed at center of screen with separate control panel');
 };
 
 // Set up click listener for overlay placement
 const setupOverlayPlacement = () => {
-  if (pixelArtDataUrl) {
-    placeOverlay(pixelArtDataUrl);
-  }
+  // Create a dummy data URL for the overlay (not used in the new implementation)
+  const dummyDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+  placeOverlay(dummyDataUrl);
 };
 
 // Listen for messages from the SidePanel
@@ -468,6 +552,11 @@ const removeOverlay = () => {
   if (overlayElement) {
     overlayElement.remove();
     overlayElement = null;
+  }
+  
+  if (controlPanelElement) {
+    controlPanelElement.remove();
+    controlPanelElement = null;
   }
   
   // Remove any existing highlights
