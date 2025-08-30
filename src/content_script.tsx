@@ -257,6 +257,68 @@ const placeOverlay = (dataUrl: string) => {
   zoomButtonsContainer.appendChild(zoomOutBtn);
   zoomButtonsContainer.appendChild(zoomInBtn);
   
+  // Create direction buttons container
+  const directionButtonsContainer = document.createElement('div');
+  directionButtonsContainer.style.display = 'grid';
+  directionButtonsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  directionButtonsContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
+  directionButtonsContainer.style.gap = '5px';
+  directionButtonsContainer.style.marginBottom = '10px';
+  
+  // Create direction buttons
+  const upBtn = document.createElement('button');
+  upBtn.textContent = '↑';
+  upBtn.style.background = '#e0e0e0';
+  upBtn.style.border = '1px solid #ccc';
+  upBtn.style.borderRadius = '4px';
+  upBtn.style.padding = '5px';
+  upBtn.style.cursor = 'pointer';
+  upBtn.style.fontSize = '14px';
+  upBtn.style.fontWeight = 'bold';
+  upBtn.style.gridRow = '1';
+  upBtn.style.gridColumn = '2';
+  
+  const leftBtn = document.createElement('button');
+  leftBtn.textContent = '←';
+  leftBtn.style.background = '#e0e0e0';
+  leftBtn.style.border = '1px solid #ccc';
+  leftBtn.style.borderRadius = '4px';
+  leftBtn.style.padding = '5px';
+  leftBtn.style.cursor = 'pointer';
+  leftBtn.style.fontSize = '14px';
+  leftBtn.style.fontWeight = 'bold';
+  leftBtn.style.gridRow = '2';
+  leftBtn.style.gridColumn = '1';
+  
+  const rightBtn = document.createElement('button');
+  rightBtn.textContent = '→';
+  rightBtn.style.background = '#e0e0e0';
+  rightBtn.style.border = '1px solid #ccc';
+  rightBtn.style.borderRadius = '4px';
+  rightBtn.style.padding = '5px';
+  rightBtn.style.cursor = 'pointer';
+  rightBtn.style.fontSize = '14px';
+  rightBtn.style.fontWeight = 'bold';
+  rightBtn.style.gridRow = '2';
+  rightBtn.style.gridColumn = '3';
+  
+  const downBtn = document.createElement('button');
+  downBtn.textContent = '↓';
+  downBtn.style.background = '#e0e0e0';
+  downBtn.style.border = '1px solid #ccc';
+  downBtn.style.borderRadius = '4px';
+  downBtn.style.padding = '5px';
+  downBtn.style.cursor = 'pointer';
+  downBtn.style.fontSize = '14px';
+  downBtn.style.fontWeight = 'bold';
+  downBtn.style.gridRow = '3';
+  downBtn.style.gridColumn = '2';
+  
+  directionButtonsContainer.appendChild(upBtn);
+  directionButtonsContainer.appendChild(leftBtn);
+  directionButtonsContainer.appendChild(rightBtn);
+  directionButtonsContainer.appendChild(downBtn);
+  
   // Create mode toggle button
   const modeToggleBtn = document.createElement('button');
   modeToggleBtn.textContent = 'Enable Drag Mode';
@@ -304,6 +366,7 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.appendChild(zoomLabel);
   controlPanelElement.appendChild(zoomSlider);
   controlPanelElement.appendChild(zoomButtonsContainer);
+  controlPanelElement.appendChild(directionButtonsContainer);
   controlPanelElement.appendChild(modeToggleBtn);
   controlPanelElement.appendChild(closeBtn);
   document.body.appendChild(controlPanelElement);
@@ -374,6 +437,57 @@ const placeOverlay = (dataUrl: string) => {
         overlayElement.style.pointerEvents = 'none';
         modeToggleBtn.textContent = 'Enable Drag Mode';
         modeToggleBtn.style.background = '#4CAF50';
+      }
+    }
+  });
+  
+  // Direction buttons event handlers
+  const moveStep = 1; // 1 pixel movement step
+  
+  upBtn.addEventListener('click', () => {
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate(${currentX}px, ${currentY - moveStep}px)`;
+      }
+    }
+  });
+  
+  downBtn.addEventListener('click', () => {
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate(${currentX}px, ${currentY + moveStep}px)`;
+      }
+    }
+  });
+  
+  leftBtn.addEventListener('click', () => {
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate(${currentX - moveStep}px, ${currentY}px)`;
+      }
+    }
+  });
+  
+  rightBtn.addEventListener('click', () => {
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate(${currentX + moveStep}px, ${currentY}px)`;
       }
     }
   });
