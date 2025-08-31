@@ -515,9 +515,7 @@ const SidePanel = () => {
           colorCounts[color] = count;
         });
         
-        // 将colorCounts传递给handlePlaceOverlay
-        // 这里我们暂时保存在window对象上，稍后会改进
-        (window as any).pixelArtColorCounts = colorCounts;
+        // 不再计算颜色统计，让Content Script自己计算
       });
     } catch (error) {
       console.error("Error converting image:", error);
@@ -530,8 +528,8 @@ const SidePanel = () => {
     
     setIsPlacingOverlay(true);
     
-    // 从window对象获取颜色统计信息
-    const colorCounts = (window as any).pixelArtColorCounts || {};
+    // 不再从window对象获取颜色统计信息
+    const colorCounts = {}; // 空对象，让Content Script自己计算
     
     // Get selected colors for the palette
     const selectedPalette = paletteColors
@@ -559,7 +557,7 @@ const SidePanel = () => {
             action: "prepareForOverlayPlacement",
             pixelArtDataUrl: pixelArtDataUrl,
             scaledImageDataUrl: scaledImageDataUrl, // 使用scaledImageDataUrl中存储的图像数据
-            colorCounts: colorCounts,
+            // 不再传输colorCounts，让Content Script自己计算
             pixelScale: pixelScale,  // Add pixelScale to the message
             palette: selectedPalette,  // Add selected palette to the message
             originalImageWidth: imageRef.current?.naturalWidth || 0,  // Add original image width

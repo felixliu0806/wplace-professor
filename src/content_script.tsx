@@ -230,7 +230,7 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
 };
 
 // Function to create color panel
-const createColorPanel = (colorCounts: { [key: string]: number }, pixelScale: number) => {
+const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelScale: number) => {
   // Remove existing color panel if any
   // Remove the wrapper if it exists in the DOM
   const existingWrapper = document.getElementById('wplace-professor-color-panel-wrapper');
@@ -238,220 +238,59 @@ const createColorPanel = (colorCounts: { [key: string]: number }, pixelScale: nu
     existingWrapper.remove();
   }
 
-  // Create color panel wrapper (always visible)
-  const colorPanelWrapper = document.createElement('div');
-  colorPanelWrapper.id = 'wplace-professor-color-panel-wrapper';
-  colorPanelWrapper.style.marginTop = '12px';
-  colorPanelWrapper.style.border = '1px solid #ddd';
-  colorPanelWrapper.style.borderRadius = '4px';
-  colorPanelWrapper.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
-
-  // Create color panel title with toggle button (always visible)
-  const titleContainer = document.createElement('div');
-  titleContainer.style.display = 'flex';
-  titleContainer.style.justifyContent = 'space-between';
-  titleContainer.style.alignItems = 'center';
-  titleContainer.style.padding = '8px';
-  titleContainer.style.cursor = 'pointer';
-
-  const title = document.createElement('h4');
-  title.textContent = 'Colors';
-  title.style.margin = '0';
-  title.style.fontSize = '15px';
-  title.style.fontWeight = 'bold';
-  title.style.color = '#333';
-
-  // Create buttons container for clear and toggle buttons
-  const buttonsContainer = document.createElement('div');
-  buttonsContainer.style.display = 'flex';
-  buttonsContainer.style.gap = '4px';
-
-  // Create clear selection button
-  const clearButton = document.createElement('button');
-  clearButton.textContent = '✕'; // X symbol for clear
-  clearButton.style.background = 'none';
-  clearButton.style.border = 'none';
-  clearButton.style.fontSize = '12px';
-  clearButton.style.cursor = 'pointer';
-  clearButton.style.padding = '2px 6px';
-  clearButton.style.borderRadius = '3px';
-  clearButton.style.backgroundColor = '#e0e0e0';
-  clearButton.title = 'Clear color selection';
-
-  // Add click event to clear color selection
-  clearButton.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevent triggering the title container click event
-
-    // Clear any existing color filter
-    (window as any).currentColorFilter = null;
-
-    // Remove highlight from all color buttons
-    const allButtons = colorPanelElement?.querySelectorAll('div[style*="flex"]');
-    allButtons?.forEach(btn => {
-      (btn as HTMLElement).style.fontWeight = 'normal';
-    });
-
-    // Redraw canvas with all colors
-    const canvas = overlayElement?.querySelector('canvas');
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const img = new Image();
-        img.onload = function () {
-          // Get current scale from the zoom slider
-          const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
-          const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
-          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, null);
-        };
-        img.src = (window as any).currentPixelArtDataUrl || '';
-      }
+  // If colorCounts is null, we need to calculate it from the scaled image data
+  if (!colorCounts) {
+    // Get the scaled image data URL from window object
+    const scaledImageDataUrl = (window as any).currentScaledImageDataUrl;
+    if (!scaledImageDataUrl) {
+      console.error("No scaled image data URL available for color counting");
+      return;
     }
-  });
 
-  const toggleButton = document.createElement('button');
-  toggleButton.textContent = '▲'; // Up arrow for collapse (default expanded)
-  toggleButton.style.background = 'none';
-  toggleButton.style.border = 'none';
-  toggleButton.style.fontSize = '12px';
-  toggleButton.style.cursor = 'pointer';
-  toggleButton.style.padding = '2px 6px';
-  toggleButton.style.borderRadius = '3px';
-  toggleButton.style.backgroundColor = '#e0e0e0';
+    // Load the scaled image and calculate color counts
+    const scaledImg = new Image();
+    scaledImg.onload = function () {
+      // Create a temporary canvas for processing
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
 
-  buttonsContainer.appendChild(clearButton);
-  buttonsContainer.appendChild(toggleButton);
-  titleContainer.appendChild(title);
-  titleContainer.appendChild(buttonsContainer);
+      // Draw the scaled image
+      tempCanvas.width = scaledImg.naturalWidth;
+      tempCanvas.height = scaledImg.naturalHeight;
+      tempCtx.drawImage(scaledImg, 0, 0);
 
-  // Create the actual color panel content (can be hidden)
-  colorPanelElement = document.createElement('div');
-  colorPanelElement.id = 'wplace-professor-color-panel';
-  colorPanelElement.style.padding = '8px';
-  colorPanelElement.style.maxHeight = '180px';
-  colorPanelElement.style.overflowY = 'auto';
-  colorPanelElement.style.display = 'block'; // Initially visible (expanded)
+      // Get image data
+      const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const scaledData = scaledImageData.data;
 
-  // Create color info
-  const totalColors = Object.keys(colorCounts).length;
-  const totalCount = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+      // Count colors
+      const calculatedColorCounts: { [key: string]: number } = {};
+      for (let y = 0; y < scaledImg.naturalHeight; y++) {
+        for (let x = 0; x < scaledImg.naturalWidth; x++) {
+          const i = y * 4 * scaledImg.naturalWidth + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
 
-  const info = document.createElement('div');
-  info.textContent = `${totalColors} colors, ${totalCount} blocks`;
-  info.style.fontSize = '12px';
-  info.style.marginBottom = '8px';
-  info.style.color = '#666';
+          // Skip transparent pixels
+          if (a === 0) continue;
 
-  colorPanelElement.appendChild(info);
-
-  // Create color buttons container
-  const colorButtonsContainer = document.createElement('div');
-  colorButtonsContainer.id = 'color-buttons-container';
-
-  // Create color buttons
-  // Sort colors by count in descending order
-  const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
-
-  // Create color buttons
-  for (const [color, count] of sortedColors) {
-    const colorButton = document.createElement('div');
-    colorButton.style.display = 'flex';
-    colorButton.style.alignItems = 'center';
-    colorButton.style.marginBottom = '4px';
-    colorButton.style.padding = '4px';
-    colorButton.style.borderRadius = '3px';
-    colorButton.style.cursor = 'pointer';
-    colorButton.style.transition = 'background-color 0.2s';
-    colorButton.style.fontSize = '12px';
-
-    colorButton.addEventListener('mouseenter', () => {
-      colorButton.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-    });
-
-    colorButton.addEventListener('mouseleave', () => {
-      colorButton.style.backgroundColor = 'transparent';
-    });
-
-    // Color swatch
-    const swatch = document.createElement('div');
-    swatch.style.width = '16px';
-    swatch.style.height = '16px';
-    swatch.style.backgroundColor = color;
-    swatch.style.border = '1px solid #ccc';
-    swatch.style.borderRadius = '2px';
-    swatch.style.marginRight = '8px';
-
-    // Color info
-    const colorInfo = document.createElement('div');
-    colorInfo.textContent = `${color} (${count})`;
-    colorInfo.style.flex = '1';
-
-    colorButton.appendChild(swatch);
-    colorButton.appendChild(colorInfo);
-
-    // Add click event to filter by this color
-    colorButton.addEventListener('click', () => {
-      // Highlight selected color
-      const allButtons = colorButtonsContainer.querySelectorAll('div[style*="flex"]');
-      allButtons?.forEach(btn => {
-        (btn as HTMLElement).style.fontWeight = 'normal';
-      });
-      colorButton.style.fontWeight = 'bold';
-
-      // Store current color filter
-      (window as any).currentColorFilter = color;
-
-      // Redraw canvas with only this color
-      const canvas = overlayElement?.querySelector('canvas');
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const img = new Image();
-          img.onload = function () {
-            // Get current scale from the zoom slider
-            const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
-            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, color);
-          };
-          img.src = (window as any).currentPixelArtDataUrl || '';
+          const color = `rgb(${r},${g},${b})`;
+          calculatedColorCounts[color] = (calculatedColorCounts[color] || 0) + 1;
         }
       }
 
-      // Try to click the corresponding color button in @5.txt
-      tryClickColorButtonInAt5(color);
-    });
-
-    colorButtonsContainer.appendChild(colorButton);
+      // Now create the color panel with calculated color counts
+      createColorPanelWithCalculatedColors(calculatedColorCounts, pixelScale);
+    };
+    scaledImg.src = scaledImageDataUrl;
+    return;
   }
 
-  colorPanelElement.appendChild(colorButtonsContainer);
-
-  // Add elements to wrapper
-  colorPanelWrapper.appendChild(titleContainer);
-  colorPanelWrapper.appendChild(colorPanelElement);
-
-  // Add toggle functionality to title
-  title.addEventListener('click', (e) => {
-    // Toggle visibility of color buttons container
-    if (colorPanelElement) {
-      const display = colorPanelElement.style.display;
-      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
-      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
-    }
-  });
-
-  toggleButton.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevent triggering the title container click event
-    // Toggle visibility of color buttons container
-    if (colorPanelElement) {
-      const display = colorPanelElement.style.display;
-      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
-      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
-    }
-  });
-
-  // Add color panel to control panel
-  if (controlPanelElement) {
-    controlPanelElement.appendChild(colorPanelWrapper);
-  }
+  // If we already have colorCounts, proceed with creating the panel
+  createColorPanelWithCalculatedColors(colorCounts, pixelScale);
 };
 
 // Function to try clicking the corresponding color button in @5.txt
@@ -1139,9 +978,10 @@ const setupMessageListener = () => {
       sendResponse({ availableColors: colors });
     } else if (request.action === "prepareForOverlayPlacement") {
       console.log("Received prepareForOverlayPlacement message with pixelScale:", request.pixelScale);
-      if (request.pixelArtDataUrl && request.colorCounts) {
+      if (request.pixelArtDataUrl) {
         pixelArtDataUrl = request.pixelArtDataUrl;
-        colorCounts = request.colorCounts;
+        // 不再直接使用传入的colorCounts，让createColorPanel自己计算
+        // colorCounts = request.colorCounts || {};
         // Store the pixelScale, pixelArtDataUrl, scaledImageDataUrl, palette, and original image dimensions for use in drawing functions
         (window as any).currentPixelScale = request.pixelScale || 1;
         (window as any).currentPixelArtDataUrl = request.pixelArtDataUrl;
@@ -1152,7 +992,7 @@ const setupMessageListener = () => {
         setupOverlayPlacement();
         sendResponse({ status: "Ready for overlay placement" });
       } else {
-        sendResponse({ status: "Error: Missing pixelArtDataUrl or colorCounts" });
+        sendResponse({ status: "Error: Missing pixelArtDataUrl" });
       }
     } else if (request.action === "removeOverlay") {
       removeOverlay();
@@ -1220,4 +1060,222 @@ const removeOverlay = () => {
   // Remove any existing highlights
   const existingHighlights = document.querySelectorAll('.wplace-pixel-highlight, .wplace-pixel-highlight-container');
   existingHighlights.forEach(el => el.remove());
+};
+
+// Helper function to create color panel with calculated color counts
+const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: number }, pixelScale: number) => {
+  // Create color panel wrapper (always visible)
+  const colorPanelWrapper = document.createElement('div');
+  colorPanelWrapper.id = 'wplace-professor-color-panel-wrapper';
+  colorPanelWrapper.style.marginTop = '12px';
+  colorPanelWrapper.style.border = '1px solid #ddd';
+  colorPanelWrapper.style.borderRadius = '4px';
+  colorPanelWrapper.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
+
+  // Create color panel title with toggle button (always visible)
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.padding = '8px';
+  titleContainer.style.cursor = 'pointer';
+
+  const title = document.createElement('h4');
+  title.textContent = 'Colors';
+  title.style.margin = '0';
+  title.style.fontSize = '15px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+
+  // Create buttons container for clear and toggle buttons
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.gap = '4px';
+
+  // Create clear selection button
+  const clearButton = document.createElement('button');
+  clearButton.textContent = '✕'; // X symbol for clear
+  clearButton.style.background = 'none';
+  clearButton.style.border = 'none';
+  clearButton.style.fontSize = '12px';
+  clearButton.style.cursor = 'pointer';
+  clearButton.style.padding = '2px 6px';
+  clearButton.style.borderRadius = '3px';
+  clearButton.style.backgroundColor = '#e0e0e0';
+  clearButton.title = 'Clear color selection';
+
+  // Add click event to clear color selection
+  clearButton.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent triggering the title container click event
+
+    // Clear any existing color filter
+    (window as any).currentColorFilter = null;
+
+    // Remove highlight from all color buttons
+    const allButtons = colorPanelElement?.querySelectorAll('div[style*="flex"]');
+    allButtons?.forEach(btn => {
+      (btn as HTMLElement).style.fontWeight = 'normal';
+    });
+
+    // Redraw canvas with all colors
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = new Image();
+        img.onload = function () {
+          // Get current scale from the zoom slider
+          const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
+          const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, null);
+        };
+        img.src = (window as any).currentPixelArtDataUrl || '';
+      }
+    }
+  });
+
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '▲'; // Up arrow for collapse (default expanded)
+  toggleButton.style.background = 'none';
+  toggleButton.style.border = 'none';
+  toggleButton.style.fontSize = '12px';
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.padding = '2px 6px';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.backgroundColor = '#e0e0e0';
+
+  buttonsContainer.appendChild(clearButton);
+  buttonsContainer.appendChild(toggleButton);
+  titleContainer.appendChild(title);
+  titleContainer.appendChild(buttonsContainer);
+
+  // Create the actual color panel content (can be hidden)
+  colorPanelElement = document.createElement('div');
+  colorPanelElement.id = 'wplace-professor-color-panel';
+  colorPanelElement.style.padding = '8px';
+  colorPanelElement.style.maxHeight = '180px';
+  colorPanelElement.style.overflowY = 'auto';
+  colorPanelElement.style.display = 'block'; // Initially visible (expanded)
+
+  // Create color info
+  const totalColors = Object.keys(colorCounts).length;
+  const totalCount = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+
+  const info = document.createElement('div');
+  info.textContent = `${totalColors} colors, ${totalCount} blocks`;
+  info.style.fontSize = '12px';
+  info.style.marginBottom = '8px';
+  info.style.color = '#666';
+
+  colorPanelElement.appendChild(info);
+
+  // Create color buttons container
+  const colorButtonsContainer = document.createElement('div');
+  colorButtonsContainer.id = 'color-buttons-container';
+
+  // Create color buttons
+  // Sort colors by count in descending order
+  const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+
+  // Create color buttons
+  for (const [color, count] of sortedColors) {
+    const colorButton = document.createElement('div');
+    colorButton.style.display = 'flex';
+    colorButton.style.alignItems = 'center';
+    colorButton.style.marginBottom = '4px';
+    colorButton.style.padding = '4px';
+    colorButton.style.borderRadius = '3px';
+    colorButton.style.cursor = 'pointer';
+    colorButton.style.transition = 'background-color 0.2s';
+    colorButton.style.fontSize = '12px';
+
+    colorButton.addEventListener('mouseenter', () => {
+      colorButton.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+    });
+
+    colorButton.addEventListener('mouseleave', () => {
+      colorButton.style.backgroundColor = 'transparent';
+    });
+
+    // Color swatch
+    const swatch = document.createElement('div');
+    swatch.style.width = '16px';
+    swatch.style.height = '16px';
+    swatch.style.backgroundColor = color;
+    swatch.style.border = '1px solid #ccc';
+    swatch.style.borderRadius = '2px';
+    swatch.style.marginRight = '8px';
+
+    // Color info
+    const colorInfo = document.createElement('div');
+    colorInfo.textContent = `${color} (${count})`;
+    colorInfo.style.flex = '1';
+
+    colorButton.appendChild(swatch);
+    colorButton.appendChild(colorInfo);
+
+    // Add click event to filter by this color
+    colorButton.addEventListener('click', () => {
+      // Highlight selected color
+      const allButtons = colorButtonsContainer.querySelectorAll('div[style*="flex"]');
+      allButtons?.forEach(btn => {
+        (btn as HTMLElement).style.fontWeight = 'normal';
+      });
+      colorButton.style.fontWeight = 'bold';
+
+      // Store current color filter
+      (window as any).currentColorFilter = color;
+
+      // Redraw canvas with only this color
+      const canvas = overlayElement?.querySelector('canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const img = new Image();
+          img.onload = function () {
+            // Get current scale from the zoom slider
+            const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
+            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, color);
+          };
+          img.src = (window as any).currentPixelArtDataUrl || '';
+        }
+      }
+
+      // Try to click the corresponding color button in @5.txt
+      tryClickColorButtonInAt5(color);
+    });
+
+    colorButtonsContainer.appendChild(colorButton);
+  }
+
+  colorPanelElement.appendChild(colorButtonsContainer);
+
+  // Add elements to wrapper
+  colorPanelWrapper.appendChild(titleContainer);
+  colorPanelWrapper.appendChild(colorPanelElement);
+
+  // Add toggle functionality to title
+  title.addEventListener('click', (e) => {
+    // Toggle visibility of color buttons container
+    if (colorPanelElement) {
+      const display = colorPanelElement.style.display;
+      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
+      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
+    }
+  });
+
+  toggleButton.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent triggering the title container click event
+    // Toggle visibility of color buttons container
+    if (colorPanelElement) {
+      const display = colorPanelElement.style.display;
+      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
+      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
+    }
+  });
+
+  // Add color panel to control panel
+  if (controlPanelElement) {
+    controlPanelElement.appendChild(colorPanelWrapper);
+  }
 };
