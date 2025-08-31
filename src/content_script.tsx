@@ -266,6 +266,16 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
 
       // Count colors
       const calculatedColorCounts: { [key: string]: number } = {};
+      console.log("=== Content Script颜色计算开始 ===");
+      console.log(`  图像尺寸: ${scaledImg.naturalWidth}x${scaledImg.naturalHeight}`);
+      
+      // 获取当前调色盘
+      const currentPalette = (window as any).currentPalette || [];
+      console.log("  当前调色盘:", currentPalette);
+      const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
+      
+      let outOfPaletteColors = 0;
+      
       for (let y = 0; y < scaledImg.naturalHeight; y++) {
         for (let x = 0; x < scaledImg.naturalWidth; x++) {
           const i = y * 4 * scaledImg.naturalWidth + x * 4;
@@ -279,8 +289,23 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
 
           const color = `rgb(${r},${g},${b})`;
           calculatedColorCounts[color] = (calculatedColorCounts[color] || 0) + 1;
+          
+          // 检查是否为调色盘外颜色
+          if (!paletteColorsSet.has(color)) {
+            outOfPaletteColors++;
+            if (outOfPaletteColors <= 10) {  // 只记录前10个
+              console.warn(`  发现调色盘外颜色 at (${x},${y}): ${color}`);
+            }
+          }
         }
       }
+      
+      console.log(`  检测到调色盘外颜色总数: ${outOfPaletteColors}`);
+      if (outOfPaletteColors > 0) {
+        console.log("  前几个调色盘外颜色:", Object.keys(calculatedColorCounts).filter(color => !paletteColorsSet.has(color)).slice(0, 5));
+      }
+      
+      console.log("  颜色调色板颜色数量:", Object.keys(calculatedColorCounts).length);
 
       // Now create the color panel with calculated color counts
       createColorPanelWithCalculatedColors(calculatedColorCounts, pixelScale);
@@ -1064,6 +1089,26 @@ const removeOverlay = () => {
 
 // Helper function to create color panel with calculated color counts
 const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: number }, pixelScale: number) => {
+  // DEBUG: 验证颜色统计数据
+  console.log("=== Content Script颜色面板创建 ===");
+  console.log(`  接收到的颜色种类数量: ${Object.keys(colorCounts).length}`);
+  
+  // 获取当前调色盘
+  const currentPalette = (window as any).currentPalette || [];
+  console.log("  当前调色盘:", currentPalette);
+  const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
+  
+  // 检查颜色是否在调色盘范围内
+  const outOfPaletteColors = Object.keys(colorCounts).filter(color => !paletteColorsSet.has(color));
+  console.log(`  调色盘外颜色种类数量: ${outOfPaletteColors.length}`);
+  if (outOfPaletteColors.length > 0) {
+    console.warn("  发现调色盘外颜色:", outOfPaletteColors.slice(0, 10)); // 只显示前10个
+  }
+  
+  // 计算总像素数
+  const totalPixels = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+  console.log(`  总像素数: ${totalPixels}`);
+
   // Create color panel wrapper (always visible)
   const colorPanelWrapper = document.createElement('div');
   colorPanelWrapper.id = 'wplace-professor-color-panel-wrapper';
@@ -1176,6 +1221,13 @@ const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: numb
   // Create color buttons
   // Sort colors by count in descending order
   const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+
+  // DEBUG: 显示前10个颜色信息
+  console.log("=== 前10个颜色信息 ===");
+  sortedColors.slice(0, 10).forEach(([color, count], index) => {
+    const isInPalette = paletteColorsSet.has(color);
+    console.log(`  ${index + 1}. ${color} (${count}) ${isInPalette ? '✓' : '⚠️'}`);
+  });
 
   // Create color buttons
   for (const [color, count] of sortedColors) {
