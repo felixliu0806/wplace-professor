@@ -573,8 +573,8 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   
   colorPanelElement.appendChild(colorButtonsContainer);
   
-  // Add toggle functionality
-  titleContainer.addEventListener('click', (e) => {
+  // Add toggle functionality to title
+  title.addEventListener('click', (e) => {
     // Toggle visibility of color buttons container
     if (colorPanelElement) {
       const display = colorPanelElement.style.display;
@@ -830,9 +830,10 @@ const placeOverlay = (dataUrl: string) => {
   
   // Create direction buttons container
   const directionButtonsContainer = document.createElement('div');
-  directionButtonsContainer.style.display = 'flex';
-  directionButtonsContainer.style.justifyContent = 'center';
-  directionButtonsContainer.style.gap = '4px';
+  directionButtonsContainer.style.display = 'grid';
+  directionButtonsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  directionButtonsContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
+  directionButtonsContainer.style.gap = '3px';
   directionButtonsContainer.style.marginBottom = '8px';
   
   // Create direction buttons
@@ -841,49 +842,53 @@ const placeOverlay = (dataUrl: string) => {
   upBtn.style.background = '#e0e0e0';
   upBtn.style.border = '1px solid #ccc';
   upBtn.style.borderRadius = '3px';
-  upBtn.style.padding = '4px 8px';
+  upBtn.style.padding = '4px';
   upBtn.style.cursor = 'pointer';
   upBtn.style.fontSize = '12px';
   upBtn.style.fontWeight = 'bold';
-  upBtn.style.minWidth = '30px';
+  upBtn.style.gridRow = '1';
+  upBtn.style.gridColumn = '2';
   
   const leftBtn = document.createElement('button');
   leftBtn.textContent = '←';
   leftBtn.style.background = '#e0e0e0';
   leftBtn.style.border = '1px solid #ccc';
   leftBtn.style.borderRadius = '3px';
-  leftBtn.style.padding = '4px 8px';
+  leftBtn.style.padding = '4px';
   leftBtn.style.cursor = 'pointer';
   leftBtn.style.fontSize = '12px';
   leftBtn.style.fontWeight = 'bold';
-  leftBtn.style.minWidth = '30px';
-  
-  const downBtn = document.createElement('button');
-  downBtn.textContent = '↓';
-  downBtn.style.background = '#e0e0e0';
-  downBtn.style.border = '1px solid #ccc';
-  downBtn.style.borderRadius = '3px';
-  downBtn.style.padding = '4px 8px';
-  downBtn.style.cursor = 'pointer';
-  downBtn.style.fontSize = '12px';
-  downBtn.style.fontWeight = 'bold';
-  downBtn.style.minWidth = '30px';
+  leftBtn.style.gridRow = '2';
+  leftBtn.style.gridColumn = '1';
   
   const rightBtn = document.createElement('button');
   rightBtn.textContent = '→';
   rightBtn.style.background = '#e0e0e0';
   rightBtn.style.border = '1px solid #ccc';
   rightBtn.style.borderRadius = '3px';
-  rightBtn.style.padding = '4px 8px';
+  rightBtn.style.padding = '4px';
   rightBtn.style.cursor = 'pointer';
   rightBtn.style.fontSize = '12px';
   rightBtn.style.fontWeight = 'bold';
-  rightBtn.style.minWidth = '30px';
+  rightBtn.style.gridRow = '2';
+  rightBtn.style.gridColumn = '3';
+  
+  const downBtn = document.createElement('button');
+  downBtn.textContent = '↓';
+  downBtn.style.background = '#e0e0e0';
+  downBtn.style.border = '1px solid #ccc';
+  downBtn.style.borderRadius = '3px';
+  downBtn.style.padding = '4px';
+  downBtn.style.cursor = 'pointer';
+  downBtn.style.fontSize = '12px';
+  downBtn.style.fontWeight = 'bold';
+  downBtn.style.gridRow = '3';
+  downBtn.style.gridColumn = '2';
   
   directionButtonsContainer.appendChild(upBtn);
   directionButtonsContainer.appendChild(leftBtn);
-  directionButtonsContainer.appendChild(downBtn);
   directionButtonsContainer.appendChild(rightBtn);
+  directionButtonsContainer.appendChild(downBtn);
   
   directionButtonsContainer.appendChild(upBtn);
   directionButtonsContainer.appendChild(leftBtn);
