@@ -417,12 +417,64 @@ const SidePanel = () => {
           scaledData[i] = finalColor[0];
           scaledData[i + 1] = finalColor[1];
           scaledData[i + 2] = finalColor[2];
+          console.log("Original color:", originalColor, "Final color:", finalColor);
         }
+      }
+
+      // DEBUG: 验证调色盘转换后颜色是否在调色盘范围内
+      console.log("=== 调色盘转换后颜色验证 ===");
+      const paletteColorsSet = new Set(selectedPalette.map(color => `rgb(${color[0]},${color[1]},${color[2]})`));
+      let hasOutOfPaletteColors = false;
+      
+      for (let y = 0; y < scaledImageData.height; y++) {
+        for (let x = 0; x < scaledImageData.width; x++) {
+          const i = y * 4 * scaledImageData.width + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+
+          // Skip transparent pixels
+          if (a === 0) continue;
+
+          const colorStr = `rgb(${r},${g},${b})`;
+          if (!paletteColorsSet.has(colorStr)) {
+            console.warn(`发现调色盘外颜色 at (${x},${y}): ${colorStr}`);
+            hasOutOfPaletteColors = true;
+          }
+        }
+      }
+      
+      if (!hasOutOfPaletteColors) {
+        console.log("✓ 所有颜色都在调色盘范围内");
       }
       
       // Put the modified image data back to the temp canvas
       tempCtx.putImageData(scaledImageData, 0, 0);
+
+      // DEBUG: 验证putImageData后颜色是否一致
+      console.log("=== putImageData后颜色验证 ===");
+      const verifyImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const verifyData = verifyImageData.data;
       
+      let putImageDataConsistent = true;
+      for (let i = 0; i < Math.min(20, scaledData.length); i += 4) {
+        if (scaledData[i] !== verifyData[i] || 
+            scaledData[i+1] !== verifyData[i+1] || 
+            scaledData[i+2] !== verifyData[i+2] || 
+            scaledData[i+3] !== verifyData[i+3]) {
+          console.warn(`putImageData后颜色不一致 at index ${i/4}: 
+Expected: rgb(${scaledData[i]},${scaledData[i+1]},${scaledData[i+2]},${scaledData[i+3]})
+Actual: rgb(${verifyData[i]},${verifyData[i+1]},${verifyData[i+2]},${verifyData[i+3]})`);
+          putImageDataConsistent = false;
+          break;
+        }
+      }
+      
+      if (putImageDataConsistent) {
+        console.log("✓ putImageData后颜色一致");
+      }
+
       // 直接使用已经处理好的缩小图像数据
       // 获取缩小并应用调色板处理后的图像数据 URL
       const scaledImageDataUrl = tempCanvas.toDataURL();
@@ -462,9 +514,34 @@ const SidePanel = () => {
           const pixelWidth = nextPixelX - pixelX;
           const pixelHeight = nextPixelY - pixelY;
           
+          // DEBUG: 检查Canvas状态
+          if (x === 0 && y === 0) {  // 只检查第一个像素以减少日志
+            console.log("=== fillRect前Canvas状态 ===");
+            console.log("  globalAlpha:", ctx.globalAlpha);
+            console.log("  globalCompositeOperation:", ctx.globalCompositeOperation);
+            console.log("  imageSmoothingEnabled:", ctx.imageSmoothingEnabled);
+            console.log("  fillStyle:", ctx.fillStyle);
+          }
+
           // Fill the expanded pixel
           ctx.fillStyle = `rgb(${r},${g},${b})`;
           ctx.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
+          
+          // DEBUG: 检查绘制后的颜色
+          if (x === 0 && y === 0) {  // 只检查第一个像素以减少日志
+            try {
+              const imageData = ctx.getImageData(pixelX, pixelY, 1, 1);
+              const data = imageData.data;
+              console.log("=== fillRect后实际颜色 ===");
+              console.log(`  期望颜色: rgb(${r},${g},${b})`);
+              console.log(`  实际颜色: rgb(${data[0]},${data[1]},${data[2]})`);
+              if (data[0] !== r || data[1] !== g || data[2] !== b) {
+                console.warn("  颜色发生变化!");
+              }
+            } catch (e: unknown) {
+              console.log("  无法读取像素颜色:", (e as Error).message);
+            }
+          }
         }
       }
       
@@ -477,6 +554,14 @@ const SidePanel = () => {
           const w = canvasRef.current.width;
           const h = canvasRef.current.height;
           const imgPixels = ctx.getImageData(0, 0, w, h);
+          
+          // DEBUG: 验证颜色统计来源
+          console.log("=== 颜色统计来源验证 ===");
+          console.log(`  Canvas尺寸: ${w}x${h}`);
+          console.log(`  像素总数: ${imgPixels.width * imgPixels.height}`);
+          
+          // 验证调色盘
+          const paletteColorsSet = new Set(selectedPalette.map(color => `rgb(${color[0]},${color[1]},${color[2]})`));
           
           for (let y = 0; y < imgPixels.height; y++) {
             for (let x = 0; x < imgPixels.width; x++) {
@@ -492,8 +577,15 @@ const SidePanel = () => {
               const color = `rgb(${r},${g},${b})`;
               const currentCount = colorCount.get(color) || 0;
               colorCount.set(color, currentCount + 1);
+              
+              // DEBUG: 检查是否有调色盘外颜色
+              if (!paletteColorsSet.has(color) && x < 5 && y < 5) {  // 只检查前几个像素以减少日志
+                console.warn(`发现调色盘外颜色 at (${x},${y}): ${color}`);
+              }
             }
           }
+          
+          console.log(`  检测到 ${colorCount.size} 种颜色`);
         }
       }
         
