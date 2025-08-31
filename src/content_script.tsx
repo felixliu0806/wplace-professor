@@ -393,12 +393,12 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   // Create color panel container
   colorPanelElement = document.createElement('div');
   colorPanelElement.id = 'wplace-professor-color-panel';
-  colorPanelElement.style.marginTop = '15px';
-  colorPanelElement.style.padding = '10px';
+  colorPanelElement.style.marginTop = '12px';
+  colorPanelElement.style.padding = '8px';
   colorPanelElement.style.border = '1px solid #ddd';
   colorPanelElement.style.borderRadius = '4px';
   colorPanelElement.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
-  colorPanelElement.style.maxHeight = '200px';
+  colorPanelElement.style.maxHeight = '180px';
   colorPanelElement.style.overflowY = 'auto';
   colorPanelElement.style.display = 'block'; // Initially visible (expanded)
   
@@ -407,13 +407,13 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   titleContainer.style.display = 'flex';
   titleContainer.style.justifyContent = 'space-between';
   titleContainer.style.alignItems = 'center';
-  titleContainer.style.marginBottom = '10px';
+  titleContainer.style.marginBottom = '8px';
   titleContainer.style.cursor = 'pointer';
   
   const title = document.createElement('h4');
-  title.textContent = 'Color Palette';
+  title.textContent = 'Colors';
   title.style.margin = '0';
-  title.style.fontSize = '14px';
+  title.style.fontSize = '15px';
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
   
@@ -435,9 +435,9 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   const totalCount = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
   
   const info = document.createElement('div');
-  info.textContent = `Colors: ${totalColors}, Total blocks: ${totalCount}`;
-  info.style.fontSize = '11px';
-  info.style.marginBottom = '10px';
+  info.textContent = `${totalColors} colors, ${totalCount} blocks`;
+  info.style.fontSize = '12px';
+  info.style.marginBottom = '8px';
   info.style.color = '#666';
   
   colorPanelElement.appendChild(titleContainer);
@@ -448,15 +448,20 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   colorButtonsContainer.id = 'color-buttons-container';
   
   // Create color buttons
-  for (const [color, count] of Object.entries(colorCounts)) {
+  // Sort colors by count in descending order
+  const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+  
+  // Create color buttons
+  for (const [color, count] of sortedColors) {
     const colorButton = document.createElement('div');
     colorButton.style.display = 'flex';
     colorButton.style.alignItems = 'center';
-    colorButton.style.marginBottom = '5px';
-    colorButton.style.padding = '5px';
-    colorButton.style.borderRadius = '4px';
+    colorButton.style.marginBottom = '4px';
+    colorButton.style.padding = '4px';
+    colorButton.style.borderRadius = '3px';
     colorButton.style.cursor = 'pointer';
     colorButton.style.transition = 'background-color 0.2s';
+    colorButton.style.fontSize = '12px';
     
     colorButton.addEventListener('mouseenter', () => {
       colorButton.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
@@ -468,17 +473,16 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
     
     // Color swatch
     const swatch = document.createElement('div');
-    swatch.style.width = '20px';
-    swatch.style.height = '20px';
+    swatch.style.width = '16px';
+    swatch.style.height = '16px';
     swatch.style.backgroundColor = color;
     swatch.style.border = '1px solid #ccc';
-    swatch.style.borderRadius = '3px';
-    swatch.style.marginRight = '10px';
+    swatch.style.borderRadius = '2px';
+    swatch.style.marginRight = '8px';
     
     // Color info
     const colorInfo = document.createElement('div');
     colorInfo.textContent = `${color} (${count})`;
-    colorInfo.style.fontSize = '12px';
     colorInfo.style.flex = '1';
     
     colorButton.appendChild(swatch);
@@ -709,17 +713,18 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.right = '20px';
   controlPanelElement.style.zIndex = '99999';
   controlPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-  controlPanelElement.style.padding = '15px';
-  controlPanelElement.style.borderRadius = '8px';
+  controlPanelElement.style.padding = '12px';
+  controlPanelElement.style.borderRadius = '6px';
   controlPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   controlPanelElement.style.fontFamily = 'Arial, sans-serif';
-  controlPanelElement.style.minWidth = '200px';
+  controlPanelElement.style.minWidth = '180px';
+  controlPanelElement.style.fontSize = '14px'; // Base font size
   
   // Create control panel title
   const title = document.createElement('h3');
-  title.textContent = 'Overlay Controls';
-  title.style.margin = '0 0 10px 0';
-  title.style.fontSize = '16px';
+  title.textContent = 'Controls';
+  title.style.margin = '0 0 8px 0';
+  title.style.fontSize = '18px';
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
   
@@ -727,9 +732,10 @@ const placeOverlay = (dataUrl: string) => {
   const zoomLabel = document.createElement('div');
   zoomLabel.id = 'zoom-label';
   zoomLabel.textContent = 'Zoom: 1.00x';
-  zoomLabel.style.fontSize = '14px';
-  zoomLabel.style.marginBottom = '5px';
+  zoomLabel.style.fontSize = '13px';
+  zoomLabel.style.marginBottom = '4px';
   zoomLabel.style.color = '#555';
+  zoomLabel.style.fontWeight = 'bold';
   
   const zoomSlider = document.createElement('input');
   zoomSlider.type = 'range';
@@ -739,14 +745,14 @@ const placeOverlay = (dataUrl: string) => {
   zoomSlider.step = '0.01';
   zoomSlider.value = '1.0';
   zoomSlider.style.width = '100%';
-  zoomSlider.style.marginBottom = '5px';
+  zoomSlider.style.marginBottom = '4px';
   zoomSlider.style.cursor = 'pointer';
   
   // Create zoom buttons container
   const zoomButtonsContainer = document.createElement('div');
   zoomButtonsContainer.style.display = 'flex';
-  zoomButtonsContainer.style.gap = '5px';
-  zoomButtonsContainer.style.marginBottom = '10px';
+  zoomButtonsContainer.style.gap = '4px';
+  zoomButtonsContainer.style.marginBottom = '8px';
   
   // Create zoom out button
   const zoomOutBtn = document.createElement('button');
@@ -754,10 +760,10 @@ const placeOverlay = (dataUrl: string) => {
   zoomOutBtn.style.flex = '1';
   zoomOutBtn.style.background = '#f0f0f0';
   zoomOutBtn.style.border = '1px solid #ccc';
-  zoomOutBtn.style.borderRadius = '4px';
-  zoomOutBtn.style.padding = '5px';
+  zoomOutBtn.style.borderRadius = '3px';
+  zoomOutBtn.style.padding = '4px';
   zoomOutBtn.style.cursor = 'pointer';
-  zoomOutBtn.style.fontSize = '16px';
+  zoomOutBtn.style.fontSize = '14px';
   zoomOutBtn.style.fontWeight = 'bold';
   
   // Create zoom in button
@@ -766,10 +772,10 @@ const placeOverlay = (dataUrl: string) => {
   zoomInBtn.style.flex = '1';
   zoomInBtn.style.background = '#f0f0f0';
   zoomInBtn.style.border = '1px solid #ccc';
-  zoomInBtn.style.borderRadius = '4px';
-  zoomInBtn.style.padding = '5px';
+  zoomInBtn.style.borderRadius = '3px';
+  zoomInBtn.style.padding = '4px';
   zoomInBtn.style.cursor = 'pointer';
-  zoomInBtn.style.fontSize = '16px';
+  zoomInBtn.style.fontSize = '14px';
   zoomInBtn.style.fontWeight = 'bold';
   
   zoomButtonsContainer.appendChild(zoomOutBtn);
@@ -780,18 +786,18 @@ const placeOverlay = (dataUrl: string) => {
   directionButtonsContainer.style.display = 'grid';
   directionButtonsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
   directionButtonsContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
-  directionButtonsContainer.style.gap = '5px';
-  directionButtonsContainer.style.marginBottom = '10px';
+  directionButtonsContainer.style.gap = '3px';
+  directionButtonsContainer.style.marginBottom = '8px';
   
   // Create direction buttons
   const upBtn = document.createElement('button');
   upBtn.textContent = '↑';
   upBtn.style.background = '#e0e0e0';
   upBtn.style.border = '1px solid #ccc';
-  upBtn.style.borderRadius = '4px';
-  upBtn.style.padding = '5px';
+  upBtn.style.borderRadius = '3px';
+  upBtn.style.padding = '4px';
   upBtn.style.cursor = 'pointer';
-  upBtn.style.fontSize = '14px';
+  upBtn.style.fontSize = '12px';
   upBtn.style.fontWeight = 'bold';
   upBtn.style.gridRow = '1';
   upBtn.style.gridColumn = '2';
@@ -800,10 +806,10 @@ const placeOverlay = (dataUrl: string) => {
   leftBtn.textContent = '←';
   leftBtn.style.background = '#e0e0e0';
   leftBtn.style.border = '1px solid #ccc';
-  leftBtn.style.borderRadius = '4px';
-  leftBtn.style.padding = '5px';
+  leftBtn.style.borderRadius = '3px';
+  leftBtn.style.padding = '4px';
   leftBtn.style.cursor = 'pointer';
-  leftBtn.style.fontSize = '14px';
+  leftBtn.style.fontSize = '12px';
   leftBtn.style.fontWeight = 'bold';
   leftBtn.style.gridRow = '2';
   leftBtn.style.gridColumn = '1';
@@ -812,10 +818,10 @@ const placeOverlay = (dataUrl: string) => {
   rightBtn.textContent = '→';
   rightBtn.style.background = '#e0e0e0';
   rightBtn.style.border = '1px solid #ccc';
-  rightBtn.style.borderRadius = '4px';
-  rightBtn.style.padding = '5px';
+  rightBtn.style.borderRadius = '3px';
+  rightBtn.style.padding = '4px';
   rightBtn.style.cursor = 'pointer';
-  rightBtn.style.fontSize = '14px';
+  rightBtn.style.fontSize = '12px';
   rightBtn.style.fontWeight = 'bold';
   rightBtn.style.gridRow = '2';
   rightBtn.style.gridColumn = '3';
@@ -824,10 +830,10 @@ const placeOverlay = (dataUrl: string) => {
   downBtn.textContent = '↓';
   downBtn.style.background = '#e0e0e0';
   downBtn.style.border = '1px solid #ccc';
-  downBtn.style.borderRadius = '4px';
-  downBtn.style.padding = '5px';
+  downBtn.style.borderRadius = '3px';
+  downBtn.style.padding = '4px';
   downBtn.style.cursor = 'pointer';
-  downBtn.style.fontSize = '14px';
+  downBtn.style.fontSize = '12px';
   downBtn.style.fontWeight = 'bold';
   downBtn.style.gridRow = '3';
   downBtn.style.gridColumn = '2';
@@ -839,16 +845,16 @@ const placeOverlay = (dataUrl: string) => {
   
   // Create mode toggle button
   const modeToggleBtn = document.createElement('button');
-  modeToggleBtn.textContent = 'Enable Drag Mode';
+  modeToggleBtn.textContent = 'Drag Mode';
   modeToggleBtn.style.background = '#4CAF50';
   modeToggleBtn.style.color = 'white';
   modeToggleBtn.style.border = 'none';
-  modeToggleBtn.style.borderRadius = '4px';
-  modeToggleBtn.style.padding = '8px 12px';
+  modeToggleBtn.style.borderRadius = '3px';
+  modeToggleBtn.style.padding = '6px 10px';
   modeToggleBtn.style.cursor = 'pointer';
-  modeToggleBtn.style.fontSize = '14px';
+  modeToggleBtn.style.fontSize = '13px';
   modeToggleBtn.style.width = '100%';
-  modeToggleBtn.style.marginBottom = '10px';
+  modeToggleBtn.style.marginBottom = '8px';
   modeToggleBtn.style.fontWeight = 'bold';
   
   modeToggleBtn.addEventListener('mouseenter', () => {
@@ -861,14 +867,14 @@ const placeOverlay = (dataUrl: string) => {
   
   // Create close button
   const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'Close Overlay';
+  closeBtn.textContent = 'Close';
   closeBtn.style.background = '#ff4444';
   closeBtn.style.color = 'white';
   closeBtn.style.border = 'none';
-  closeBtn.style.borderRadius = '4px';
-  closeBtn.style.padding = '8px 12px';
+  closeBtn.style.borderRadius = '3px';
+  closeBtn.style.padding = '6px 10px';
   closeBtn.style.cursor = 'pointer';
-  closeBtn.style.fontSize = '14px';
+  closeBtn.style.fontSize = '13px';
   closeBtn.style.width = '100%';
   closeBtn.style.fontWeight = 'bold';
   
