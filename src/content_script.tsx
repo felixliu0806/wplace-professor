@@ -4,6 +4,7 @@ let controlPanelElement: HTMLDivElement | null = null;
 let colorPanelElement: HTMLDivElement | null = null;
 let pixelArtDataUrl: string | null = null;
 let colorCounts: { [color: string]: number } = {};
+let scaledRef: string | null = null; // 新增的scaledRef属性
 
 // Keep track of whether the listener is already set up
 let isListenerSetUp = false;
@@ -100,56 +101,433 @@ const detectAvailableColors = (): string[] => {
   }
 };
 
-// Function to redraw grid pattern with new scale
-const redrawGridPattern = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, gridSize: number, cellSize: number) => {
-  // Clear canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Function to draw a pixel block with border, padding, and center color
+const drawPixelBlock = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  blockSize: number,
+  color: string
+) => {
+  // Draw the outer border (thin line)
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, blockSize, blockSize);
   
-  // Update canvas size with precise dimensions
-  canvas.width = Math.max(1, Math.round(gridSize * cellSize));
-  canvas.height = Math.max(1, Math.round(gridSize * cellSize));
+  // Calculate padding (10% of blockSize for padding on each side)
+  const padding = Math.max(1, Math.floor(blockSize * 0.1));
   
-  // Set image smoothing for better quality
-  ctx.imageSmoothingEnabled = false; // Keep pixelated look
+  // Draw the inner area (padding area) in white or light gray
+  const innerX = x + padding;
+  const innerY = y + padding;
+  const innerSize = blockSize - padding * 2;
   
-  // Redraw grid pattern with smooth scaling
-  for (let y = 0; y < gridSize; y++) {
-    for (let x = 0; x < gridSize; x++) {
-      // Create a checkerboard pattern with lighter colors and higher transparency
-      const color = (x + y) % 2 === 0 ? 'rgba(255, 150, 150, 0.4)' : 'rgba(150, 150, 255, 0.4)'; // Even lighter colors with 40% opacity
+  if (innerSize > 0) {
+    ctx.fillStyle = '#f0f0f0'; // Light gray for padding area
+    ctx.fillRect(innerX, innerY, innerSize, innerSize);
+    
+    // Draw the center color area (80% of blockSize)
+    const centerPadding = Math.max(1, Math.floor(blockSize * 0.15)); // 15% padding for center area
+    const centerX = x + centerPadding;
+    const centerY = y + centerPadding;
+    const centerSize = blockSize - centerPadding * 2;
+    
+    if (centerSize > 0) {
       ctx.fillStyle = color;
+      ctx.fillRect(centerX, centerY, centerSize, centerSize);
+    }
+  }
+};
+
+// Function to redraw canvas with color blocks and borders
+const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, pixelScale: number, scale: number, colorFilter: string | null = null) => {
+  // Get palette from window object
+  const palette = (window as any).currentPalette || [];
+  
+  // Custom pixelation logic without using pixelit.js
+  // Step 1: Draw the image to the canvas
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  
+  // Create a temporary canvas for processing
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) return;
+  
+  // Draw the original image
+  tempCtx.drawImage(img, 0, 0);
+  
+  // Step 2: Pixelate the image by scaling down and then back up
+  // Create a temporary canvas for scaling down
+  const scaleTempCanvas = document.createElement('canvas');
+  const scaleTempCtx = scaleTempCanvas.getContext('2d');
+  if (!scaleTempCtx) return;
+  
+  // Disable image smoothing for pixel-perfect scaling
+  (scaleTempCtx as any).mozImageSmoothingEnabled = false;
+  (scaleTempCtx as any).webkitImageSmoothingEnabled = false;
+  scaleTempCtx.imageSmoothingEnabled = false;
+  
+  // Calculate scaled dimensions
+  const scaledWidth = Math.max(1, Math.round(img.naturalWidth * pixelScale));
+  const scaledHeight = Math.max(1, Math.round(img.naturalHeight * pixelScale));
+  
+  // Set temp canvas dimensions
+  scaleTempCanvas.width = scaledWidth;
+  scaleTempCanvas.height = scaledHeight;
+  
+  // Draw scaled down image
+  scaleTempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+  
+  // Clear main temp canvas and draw scaled up image
+  tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+  (tempCtx as any).mozImageSmoothingEnabled = false;
+  (tempCtx as any).webkitImageSmoothingEnabled = false;
+  tempCtx.imageSmoothingEnabled = false;
+  tempCtx.drawImage(scaleTempCanvas, 0, 0, scaledWidth, scaledHeight, 0, 0, tempCanvas.width, tempCanvas.height);
+  
+  // Step 3: Apply color palette conversion
+  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const data = imageData.data;
+  
+  // Function to calculate color similarity
+  const colorSim = (rgbColor: number[], compareColor: number[]): number => {
+    let d = 0;
+    for (let i = 0; i < rgbColor.length; i++) {
+      d += (rgbColor[i] - compareColor[i]) * (rgbColor[i] - compareColor[i]);
+    }
+    return Math.sqrt(d);
+  };
+  
+  // Function to find the most similar color in the palette
+  const similarColor = (actualColor: number[]): number[] => {
+    if (palette.length === 0) return actualColor;
+    
+    let selectedColor = palette[0];
+    let currentSim = colorSim(actualColor, palette[0]);
+    
+    for (const color of palette) {
+      const nextColor = colorSim(actualColor, color);
+      if (nextColor <= currentSim) {
+        selectedColor = color;
+        currentSim = nextColor;
+      }
+    }
+    return selectedColor;
+  };
+  
+  // Apply palette conversion to each pixel
+  for (let y = 0; y < imageData.height; y++) {
+    for (let x = 0; x < imageData.width; x++) {
+      const i = y * 4 * imageData.width + x * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
       
-      // Calculate precise positions and dimensions using floating point arithmetic
-      const xPos = x * cellSize;
-      const yPos = y * cellSize;
-      const width = cellSize;
-      const height = cellSize;
+      // Skip transparent pixels
+      if (a === 0) continue;
       
-      ctx.fillRect(xPos, yPos, width, height);
+      // Find the most similar color in the palette
+      const originalColor = [r, g, b];
+      const finalColor = similarColor(originalColor);
+      
+      // Apply the final color
+      data[i] = finalColor[0];
+      data[i + 1] = finalColor[1];
+      data[i + 2] = finalColor[2];
     }
   }
   
-  // Redraw grid lines with subpixel precision
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'; // Lighter grid lines with transparency
+  // Put the modified image data back to the temp canvas
+  tempCtx.putImageData(imageData, 0, 0);
+  
+  // Now draw each pixel as a block with border, padding, and center color
+  // Create another temporary canvas for the block drawing
+  const blockCanvas = document.createElement('canvas');
+  const blockCtx = blockCanvas.getContext('2d');
+  if (!blockCtx) return;
+  
+  // Set block canvas dimensions
+  const blockSize = 100 * scale;
+  blockCanvas.width = scaledWidth * blockSize;
+  blockCanvas.height = scaledHeight * blockSize;
+  
+  // Draw each pixel as a block, optionally filtered by color
+  for (let y = 0; y < scaledHeight; y++) {
+    for (let x = 0; x < scaledWidth; x++) {
+      const i = y * 4 * scaledWidth + x * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Skip transparent pixels
+      if (a === 0) continue;
+      
+      const color = `rgb(${r},${g},${b})`;
+      
+      // If a color filter is applied and this pixel doesn't match, skip it
+      if (colorFilter && color !== colorFilter) {
+        continue;
+      }
+      
+      // Draw pixel block with border, padding, and center color
+      const blockX = x * blockSize;
+      const blockY = y * blockSize;
+      
+      drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+    }
+  }
+  
+  // Draw border around the entire image
+  blockCtx.strokeStyle = '#000000';
+  blockCtx.lineWidth = 2;
+  blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+  
+  // Copy the block image to the main canvas
+  canvas.width = blockCanvas.width;
+  canvas.height = blockCanvas.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(blockCanvas, 0, 0);
+};
+
+// Function to create color panel
+const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: number) => {
+  // Remove existing color panel if any
+  if (colorPanelElement) {
+    colorPanelElement.remove();
+  }
+  
+  // Create color panel
+  colorPanelElement = document.createElement('div');
+  colorPanelElement.id = 'wplace-professor-color-panel';
+  colorPanelElement.style.position = 'fixed';
+  colorPanelElement.style.bottom = '20px';
+  colorPanelElement.style.right = '20px';
+  colorPanelElement.style.zIndex = '99999';
+  colorPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  colorPanelElement.style.padding = '15px';
+  colorPanelElement.style.borderRadius = '8px';
+  colorPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  colorPanelElement.style.fontFamily = 'Arial, sans-serif';
+  colorPanelElement.style.minWidth = '200px';
+  colorPanelElement.style.maxHeight = '300px';
+  colorPanelElement.style.overflowY = 'auto';
+  
+  // Create color panel title
+  const title = document.createElement('h3');
+  title.textContent = 'Color Palette';
+  title.style.margin = '0 0 10px 0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  
+  // Create color info
+  const totalColors = Object.keys(colorCounts).length;
+  const totalCount = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+  
+  const info = document.createElement('div');
+  info.textContent = `Colors: ${totalColors}, Total blocks: ${totalCount}`;
+  info.style.fontSize = '12px';
+  info.style.marginBottom = '10px';
+  info.style.color = '#666';
+  
+  colorPanelElement.appendChild(title);
+  colorPanelElement.appendChild(info);
+  
+  // Create color buttons
+  for (const [color, count] of Object.entries(colorCounts)) {
+    const colorButton = document.createElement('div');
+    colorButton.style.display = 'flex';
+    colorButton.style.alignItems = 'center';
+    colorButton.style.marginBottom = '5px';
+    colorButton.style.padding = '5px';
+    colorButton.style.borderRadius = '4px';
+    colorButton.style.cursor = 'pointer';
+    colorButton.style.transition = 'background-color 0.2s';
+    
+    colorButton.addEventListener('mouseenter', () => {
+      colorButton.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+    });
+    
+    colorButton.addEventListener('mouseleave', () => {
+      colorButton.style.backgroundColor = 'transparent';
+    });
+    
+    // Color swatch
+    const swatch = document.createElement('div');
+    swatch.style.width = '20px';
+    swatch.style.height = '20px';
+    swatch.style.backgroundColor = color;
+    swatch.style.border = '1px solid #ccc';
+    swatch.style.borderRadius = '3px';
+    swatch.style.marginRight = '10px';
+    
+    // Color info
+    const colorInfo = document.createElement('div');
+    colorInfo.textContent = `${color} (${count})`;
+    colorInfo.style.fontSize = '12px';
+    colorInfo.style.flex = '1';
+    
+    colorButton.appendChild(swatch);
+    colorButton.appendChild(colorInfo);
+    
+    // Add click event to filter by this color
+    colorButton.addEventListener('click', () => {
+      // Highlight selected color
+      const allButtons = colorPanelElement?.querySelectorAll('div[style*="flex"]');
+      allButtons?.forEach(btn => {
+        (btn as HTMLElement).style.fontWeight = 'normal';
+      });
+      colorButton.style.fontWeight = 'bold';
+      
+      // Store current color filter
+      (window as any).currentColorFilter = color;
+      
+      // Redraw canvas with only this color
+      const canvas = overlayElement?.querySelector('canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const img = new Image();
+          img.onload = function() {
+            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, 1.0, color);
+          };
+          img.src = (window as any).currentPixelArtDataUrl || '';
+        }
+      }
+      
+      // Try to click the corresponding color button in @5.txt
+      tryClickColorButtonInAt5(color);
+    });
+    
+    colorPanelElement.appendChild(colorButton);
+  }
+  
+  document.body.appendChild(colorPanelElement);
+};
+
+// Function to try clicking the corresponding color button in @5.txt
+const tryClickColorButtonInAt5 = (color: string) => {
+  console.log("Trying to click color button in @5.txt for color:", color);
+  
+  // Parse the color string to extract RGB values
+  const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (!match) {
+    console.log("Invalid color format:", color);
+    return;
+  }
+  
+  const r = parseInt(match[1]);
+  const g = parseInt(match[2]);
+  const b = parseInt(match[3]);
+  
+  // Look for buttons with matching background color
+  // The buttons are in the format: style="background: rgb(r, g, b);"
+  const buttons = document.querySelectorAll('button[style*="background"]');
+  
+  for (let i = 0; i < buttons.length; i++) {
+    const button = buttons[i];
+    const style = button.getAttribute('style');
+    
+    if (style) {
+      // Check if the button's background color matches
+      const rgbMatch = style.match(/background:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (rgbMatch) {
+        const buttonR = parseInt(rgbMatch[1]);
+        const buttonG = parseInt(rgbMatch[2]);
+        const buttonB = parseInt(rgbMatch[3]);
+        
+        // Check if colors match (allowing for small differences)
+        if (Math.abs(buttonR - r) <= 5 && Math.abs(buttonG - g) <= 5 && Math.abs(buttonB - b) <= 5) {
+          console.log("Found matching color button, clicking it");
+          (button as HTMLButtonElement).click();
+          return;
+        }
+      }
+    }
+  }
+  
+  console.log("No matching color button found in @5.txt");
+};
+
+// Function to draw pixel art with borders
+const drawPixelArtWithBorders = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
+  console.log(`drawPixelArtWithBorders called with scale: ${scale}, gridScale: ${gridScale}, gridScale * scale: ${gridScale * scale}`);
+  
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+  // Create a temporary canvas to get image data
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) return;
+  
+  tempCanvas.width = img.naturalWidth;
+  tempCanvas.height = img.naturalHeight;
+  tempCtx.drawImage(img, 0, 0);
+  
+  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const data = imageData.data;
+  
+  // Draw each pixel
+  for (let y = 0; y < tempCanvas.height; y++) {
+    for (let x = 0; x < tempCanvas.width; x++) {
+      const i = y * 4 * tempCanvas.width + x * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Skip transparent pixels
+      if (a === 0) continue;
+      
+      const pixelX = x * scale;
+      const pixelY = y * scale;
+      
+      // Draw pixel fill
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(pixelX, pixelY, scale, scale);
+    }
+  }
+  
+  // Draw grid lines for pixel blocks (gridScale x gridScale)
+  ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
   
-  // Vertical lines
-  for (let x = 0; x <= gridSize; x++) {
-    const xPos = x * cellSize;
+  // Calculate the dimensions of the scaled image
+  const scaledWidth = tempCanvas.width * scale;
+  const scaledHeight = tempCanvas.height * scale;
+  
+  console.log(`Canvas size: ${scaledWidth} x ${scaledHeight}`);
+  
+  // Vertical lines - draw a line every 'gridScale' pixels in the scaled image
+  for (let x = 0; x <= scaledWidth; x += gridScale * scale) {
     ctx.beginPath();
-    ctx.moveTo(xPos, 0);
-    ctx.lineTo(xPos, gridSize * cellSize);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, scaledHeight);
     ctx.stroke();
   }
   
-  // Horizontal lines
-  for (let y = 0; y <= gridSize; y++) {
-    const yPos = y * cellSize;
+  // Horizontal lines - draw a line every 'gridScale' pixels in the scaled image
+  for (let y = 0; y <= scaledHeight; y += gridScale * scale) {
     ctx.beginPath();
-    ctx.moveTo(0, yPos);
-    ctx.lineTo(gridSize * cellSize, yPos);
+    ctx.moveTo(0, y);
+    ctx.lineTo(scaledWidth, y);
     ctx.stroke();
   }
+  
+  console.log(`Finished drawing with scale: ${scale}, gridScale: ${gridScale}`);
+};
+
+// Function to redraw canvas with new scale
+const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, scale: number, gridScale: number) => {
+  // Set canvas size
+  canvas.width = img.naturalWidth * scale;
+  canvas.height = img.naturalHeight * scale;
+  
+  // Draw image with pixel borders
+  drawPixelArtWithBorders(ctx, img, scale, gridScale);
 };
 
 // Function to create and place the overlay
@@ -371,56 +749,365 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.appendChild(closeBtn);
   document.body.appendChild(controlPanelElement);
   
-  // Create a grid pattern instead of using the image
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    // Set fixed dimensions for the grid (e.g., 16x16 pixels)
-    const gridSize = 16;
-    const baseCellSize = 20; // Base size of each cell in pixels
-    
-    // Initial drawing
-    redrawGridPattern(canvas, ctx, gridSize, baseCellSize * parseFloat(zoomSlider.value));
-    
-    // Set up smooth zoom control with slider
-    zoomSlider.addEventListener('input', (e) => {
-      const scale = parseFloat((e.target as HTMLInputElement).value);
-      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
-      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * scale);
-    });
-    
-    // Set up zoom buttons and slider
-    const zoomStep = 0.01; // Step for zoom in/out buttons
-    
-    // Function to perform zoom
-    const performZoom = (newScale: number) => {
-      // Update UI and redraw
-      zoomSlider.value = newScale.toString();
-      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
-      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * newScale);
-      // Position is handled by drag, so we don't need to adjust it here
-    };
-    
-    // Zoom in button
-    zoomInBtn.addEventListener('click', () => {
-      const currentScale = parseFloat(zoomSlider.value);
-      const newScale = Math.min(currentScale + zoomStep, 5.0);
-      performZoom(newScale);
-    });
-    
-    // Zoom out button
-    zoomOutBtn.addEventListener('click', () => {
-      const currentScale = parseFloat(zoomSlider.value);
-      const newScale = Math.max(currentScale - zoomStep, 0.1);
-      performZoom(newScale);
-    });
-    
-    // Slider input
-    zoomSlider.addEventListener('input', (e) => {
-      const scale = parseFloat((e.target as HTMLInputElement).value);
-      (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
-      redrawGridPattern(canvas, ctx, gridSize, baseCellSize * scale);
-    });
-  }
+  // Load image and draw it on canvas with pixel borders
+  const img = new Image();
+  img.onload = function() {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // Get pixelScale and palette from window object
+      const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
+      const palette = (window as any).currentPalette || [];
+      const scaledImageDataUrl = (window as any).currentScaledImageDataUrl || null;
+      console.log("Using pixelScale:", pixelScale);
+      console.log("Using palette:", palette);
+      console.log("img.naturalWidth:", img.naturalWidth);
+      console.log("img.naturalHeight:", img.naturalHeight);
+      
+      // If we have scaled image data, use it directly
+      if (scaledImageDataUrl) {
+        const scaledImg = new Image();
+        scaledImg.onload = function() {
+          // Draw each pixel as a block with border, padding, and center color
+          // Create another temporary canvas for the block drawing
+          const blockCanvas = document.createElement('canvas');
+          const blockCtx = blockCanvas.getContext('2d');
+          if (!blockCtx) return;
+          
+          // Get the scaled image data
+          const tempCanvas = document.createElement('canvas');
+          const tempCtx = tempCanvas.getContext('2d');
+          if (!tempCtx) return;
+          
+          tempCanvas.width = scaledImg.naturalWidth;
+          tempCanvas.height = scaledImg.naturalHeight;
+          tempCtx.drawImage(scaledImg, 0, 0);
+          
+          const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const scaledData = scaledImageData.data;
+          
+          // Set block canvas dimensions
+          const blockSize = 100;
+          blockCanvas.width = scaledImg.naturalWidth * blockSize;
+          blockCanvas.height = scaledImg.naturalHeight * blockSize;
+          
+          // Draw each pixel as a block with border, padding, and center color
+          for (let y = 0; y < scaledImg.naturalHeight; y++) {
+            for (let x = 0; x < scaledImg.naturalWidth; x++) {
+              const i = y * 4 * scaledImg.naturalWidth + x * 4;
+              const r = scaledData[i];
+              const g = scaledData[i + 1];
+              const b = scaledData[i + 2];
+              const a = scaledData[i + 3];
+              
+              // Skip transparent pixels
+              if (a === 0) continue;
+              
+              const color = `rgb(${r},${g},${b})`;
+              
+              // Draw pixel block with border, padding, and center color
+              const blockX = x * blockSize;
+              const blockY = y * blockSize;
+              
+              drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+            }
+          }
+          
+          // Draw border around the entire image
+          blockCtx.strokeStyle = '#000000';
+          blockCtx.lineWidth = 2;
+          blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+          
+          // Copy the block image to the main canvas
+          canvas.width = blockCanvas.width;
+          canvas.height = blockCanvas.height;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(blockCanvas, 0, 0);
+          
+          // Count colors for the color panel
+          const colorCounts: {[key: string]: number} = {};
+          for (let y = 0; y < scaledImg.naturalHeight; y++) {
+            for (let x = 0; x < scaledImg.naturalWidth; x++) {
+              const i = y * 4 * scaledImg.naturalWidth + x * 4;
+              const r = scaledData[i];
+              const g = scaledData[i + 1];
+              const b = scaledData[i + 2];
+              const a = scaledData[i + 3];
+              
+              // Skip transparent pixels
+              if (a === 0) continue;
+              
+              const color = `rgb(${r},${g},${b})`;
+              colorCounts[color] = (colorCounts[color] || 0) + 1;
+            }
+          }
+          
+          // Store color counts for later use
+          (window as any).colorCounts = colorCounts;
+          
+          // Create color panel
+          createColorPanel(colorCounts, blockSize);
+          
+          // Set up smooth zoom control with slider
+          zoomSlider.addEventListener('input', (e) => {
+            const scale = parseFloat((e.target as HTMLInputElement).value);
+            (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
+            // Redraw the image with new scale
+            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, scale, (window as any).currentColorFilter);
+          });
+          
+          // Set up zoom buttons with same behavior as slider
+          const zoomStep = 0.01; // Step for zoom in/out buttons
+          
+          // Function to perform zoom with same behavior as slider
+          const performZoom = (newScale: number) => {
+            // Update slider and label
+            zoomSlider.value = newScale.toString();
+            (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
+            
+            // Redraw the image with new scale
+            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, newScale, (window as any).currentColorFilter);
+          };
+          
+          zoomInBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent dragging
+            const currentScale = parseFloat(zoomSlider.value);
+            const newScale = Math.min(currentScale + zoomStep, 5.0);
+            performZoom(newScale);
+          });
+          
+          zoomOutBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent dragging
+            const currentScale = parseFloat(zoomSlider.value);
+            const newScale = Math.max(currentScale - zoomStep, 0.1);
+            performZoom(newScale);
+          });
+        };
+        scaledImg.src = scaledImageDataUrl;
+      } else {
+        // Fallback to the original processing if no scaled image data is available
+        // Custom pixelation logic without using pixelit.js
+        // Step 1: Pixelate the image by scaling down
+        // Create a temporary canvas for scaling down
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+        
+        // Disable image smoothing for pixel-perfect scaling
+        (tempCtx as any).mozImageSmoothingEnabled = false;
+        (tempCtx as any).webkitImageSmoothingEnabled = false;
+        tempCtx.imageSmoothingEnabled = false;
+        
+        // Calculate scaled dimensions
+        const scaledWidth = Math.max(1, Math.round(img.naturalWidth * pixelScale));
+        const scaledHeight = Math.max(1, Math.round(img.naturalHeight * pixelScale));
+        
+        // Set temp canvas dimensions
+        tempCanvas.width = scaledWidth;
+        tempCanvas.height = scaledHeight;
+        
+        // Draw scaled down image
+        tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+        
+        // Step 2: Apply color palette conversion to the scaled down image
+        const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const scaledData = scaledImageData.data;
+        
+        // Function to calculate color similarity
+        const colorSim = (rgbColor: number[], compareColor: number[]): number => {
+          let d = 0;
+          for (let i = 0; i < rgbColor.length; i++) {
+            d += (rgbColor[i] - compareColor[i]) * (rgbColor[i] - compareColor[i]);
+          }
+          return Math.sqrt(d);
+        };
+        
+        // Function to find the most similar color in the palette
+        const similarColor = (actualColor: number[]): number[] => {
+          if (palette.length === 0) return actualColor;
+          
+          let selectedColor = palette[0];
+          let currentSim = colorSim(actualColor, palette[0]);
+          
+          for (const color of palette) {
+            const nextColor = colorSim(actualColor, color);
+            if (nextColor <= currentSim) {
+              selectedColor = color;
+              currentSim = nextColor;
+            }
+          }
+          return selectedColor;
+        };
+        
+        // Apply palette conversion to each pixel in the scaled image
+        for (let y = 0; y < scaledImageData.height; y++) {
+          for (let x = 0; x < scaledImageData.width; x++) {
+            const i = y * 4 * scaledImageData.width + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
+            
+            // Skip transparent pixels
+            if (a === 0) continue;
+            
+            // Find the most similar color in the palette
+            const originalColor = [r, g, b];
+            const finalColor = similarColor(originalColor);
+            
+            // Apply the final color
+            scaledData[i] = finalColor[0];
+            scaledData[i + 1] = finalColor[1];
+            scaledData[i + 2] = finalColor[2];
+          }
+        }
+        
+        // Put the modified image data back to the temp canvas
+        tempCtx.putImageData(scaledImageData, 0, 0);
+        
+        // Step 3: Scale back up to original size by manually expanding each pixel
+        // Set canvas dimensions to match original image
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        
+        // Clear main canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Calculate the upscale ratio
+        const upscaleRatioX = img.naturalWidth / scaledWidth;
+        const upscaleRatioY = img.naturalHeight / scaledHeight;
+        
+        // Manually expand each pixel from the scaled image
+        for (let y = 0; y < scaledHeight; y++) {
+          for (let x = 0; x < scaledWidth; x++) {
+            const i = y * 4 * scaledWidth + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
+            
+            // Skip transparent pixels
+            if (a === 0) continue;
+            
+            // Calculate the position and size of the expanded pixel using precise calculation
+            const pixelX = Math.floor(x * upscaleRatioX);
+            const pixelY = Math.floor(y * upscaleRatioY);
+            const nextPixelX = Math.floor((x + 1) * upscaleRatioX);
+            const nextPixelY = Math.floor((y + 1) * upscaleRatioY);
+            const pixelWidth = nextPixelX - pixelX;
+            const pixelHeight = nextPixelY - pixelY;
+            
+            // Fill the expanded pixel
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
+          }
+        }
+        
+        // Now draw each pixel as a block with border, padding, and center color
+        // Create another temporary canvas for the block drawing
+        const blockCanvas = document.createElement('canvas');
+        const blockCtx = blockCanvas.getContext('2d');
+        if (!blockCtx) return;
+        
+        // Set block canvas dimensions
+        const blockSize = 100;
+        blockCanvas.width = scaledWidth * blockSize;
+        blockCanvas.height = scaledHeight * blockSize;
+        
+        // Draw each pixel as a block with border, padding, and center color
+        for (let y = 0; y < scaledHeight; y++) {
+          for (let x = 0; x < scaledWidth; x++) {
+            const i = y * 4 * scaledWidth + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
+            
+            // Skip transparent pixels
+            if (a === 0) continue;
+            
+            const color = `rgb(${r},${g},${b})`;
+            
+            // Draw pixel block with border, padding, and center color
+            const blockX = x * blockSize;
+            const blockY = y * blockSize;
+            
+            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+          }
+        }
+        
+        // Draw border around the entire image
+        blockCtx.strokeStyle = '#000000';
+        blockCtx.lineWidth = 2;
+        blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+        
+        // Copy the block image to the main canvas
+        canvas.width = blockCanvas.width;
+        canvas.height = blockCanvas.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(blockCanvas, 0, 0);
+        
+        // Count colors for the color panel
+        const colorCounts: {[key: string]: number} = {};
+        for (let y = 0; y < scaledHeight; y++) {
+          for (let x = 0; x < scaledWidth; x++) {
+            const i = y * 4 * scaledWidth + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
+            
+            // Skip transparent pixels
+            if (a === 0) continue;
+            
+            const color = `rgb(${r},${g},${b})`;
+            colorCounts[color] = (colorCounts[color] || 0) + 1;
+          }
+        }
+        
+        // Store color counts for later use
+        (window as any).colorCounts = colorCounts;
+        
+        // Create color panel
+        createColorPanel(colorCounts, blockSize);
+        
+        // Set up smooth zoom control with slider
+        zoomSlider.addEventListener('input', (e) => {
+          const scale = parseFloat((e.target as HTMLInputElement).value);
+          (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
+          // Redraw the image with new scale
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, scale, (window as any).currentColorFilter);
+        });
+        
+        // Set up zoom buttons with same behavior as slider
+        const zoomStep = 0.01; // Step for zoom in/out buttons
+        
+        // Function to perform zoom with same behavior as slider
+        const performZoom = (newScale: number) => {
+          // Update slider and label
+          zoomSlider.value = newScale.toString();
+          (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
+          
+          // Redraw the image with new scale
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, newScale, (window as any).currentColorFilter);
+        };
+        
+        zoomInBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent dragging
+          const currentScale = parseFloat(zoomSlider.value);
+          const newScale = Math.min(currentScale + zoomStep, 5.0);
+          performZoom(newScale);
+        });
+        
+        zoomOutBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent dragging
+          const currentScale = parseFloat(zoomSlider.value);
+          const newScale = Math.max(currentScale - zoomStep, 0.1);
+          performZoom(newScale);
+        });
+      }
+    }
+  };
+  img.src = dataUrl;
   
   // Mode toggle button event
   let isDragMode = false;
@@ -580,9 +1267,9 @@ const placeOverlay = (dataUrl: string) => {
 
 // Set up click listener for overlay placement
 const setupOverlayPlacement = () => {
-  // Create a dummy data URL for the overlay (not used in the new implementation)
-  const dummyDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
-  placeOverlay(dummyDataUrl);
+  if (pixelArtDataUrl) {
+    placeOverlay(pixelArtDataUrl);
+  }
 };
 
 // Listen for messages from the SidePanel
@@ -603,8 +1290,11 @@ const setupMessageListener = () => {
       if (request.pixelArtDataUrl && request.colorCounts) {
         pixelArtDataUrl = request.pixelArtDataUrl;
         colorCounts = request.colorCounts;
-        // Store the pixelScale for use in drawing functions
+        // Store the pixelScale, pixelArtDataUrl, scaledImageDataUrl, and palette for use in drawing functions
         (window as any).currentPixelScale = request.pixelScale || 1;
+        (window as any).currentPixelArtDataUrl = request.pixelArtDataUrl;
+        (window as any).currentScaledImageDataUrl = request.scaledImageDataUrl || null;
+        (window as any).currentPalette = request.palette || [];
         setupOverlayPlacement();
         sendResponse({ status: "Ready for overlay placement" });
       } else {
