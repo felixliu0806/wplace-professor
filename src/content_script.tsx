@@ -386,8 +386,10 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
 // Function to create color panel
 const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: number) => {
   // Remove existing color panel if any
-  if (colorPanelElement) {
-    colorPanelElement.remove();
+  // Remove the wrapper if it exists in the DOM
+  const existingWrapper = document.getElementById('wplace-professor-color-panel-wrapper');
+  if (existingWrapper) {
+    existingWrapper.remove();
   }
   
   // Create color panel wrapper (always visible)
