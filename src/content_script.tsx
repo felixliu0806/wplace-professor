@@ -390,24 +390,20 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
     colorPanelElement.remove();
   }
   
-  // Create color panel container
-  colorPanelElement = document.createElement('div');
-  colorPanelElement.id = 'wplace-professor-color-panel';
-  colorPanelElement.style.marginTop = '12px';
-  colorPanelElement.style.padding = '8px';
-  colorPanelElement.style.border = '1px solid #ddd';
-  colorPanelElement.style.borderRadius = '4px';
-  colorPanelElement.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
-  colorPanelElement.style.maxHeight = '180px';
-  colorPanelElement.style.overflowY = 'auto';
-  colorPanelElement.style.display = 'block'; // Initially visible (expanded)
+  // Create color panel wrapper (always visible)
+  const colorPanelWrapper = document.createElement('div');
+  colorPanelWrapper.id = 'wplace-professor-color-panel-wrapper';
+  colorPanelWrapper.style.marginTop = '12px';
+  colorPanelWrapper.style.border = '1px solid #ddd';
+  colorPanelWrapper.style.borderRadius = '4px';
+  colorPanelWrapper.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
   
-  // Create color panel title with toggle button
+  // Create color panel title with toggle button (always visible)
   const titleContainer = document.createElement('div');
   titleContainer.style.display = 'flex';
   titleContainer.style.justifyContent = 'space-between';
   titleContainer.style.alignItems = 'center';
-  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.padding = '8px';
   titleContainer.style.cursor = 'pointer';
   
   const title = document.createElement('h4');
@@ -417,7 +413,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
   
-  // Create buttons container for toggle and clear buttons
+  // Create buttons container for clear and toggle buttons
   const buttonsContainer = document.createElement('div');
   buttonsContainer.style.display = 'flex';
   buttonsContainer.style.gap = '4px';
@@ -479,6 +475,14 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   titleContainer.appendChild(title);
   titleContainer.appendChild(buttonsContainer);
   
+  // Create the actual color panel content (can be hidden)
+  colorPanelElement = document.createElement('div');
+  colorPanelElement.id = 'wplace-professor-color-panel';
+  colorPanelElement.style.padding = '8px';
+  colorPanelElement.style.maxHeight = '180px';
+  colorPanelElement.style.overflowY = 'auto';
+  colorPanelElement.style.display = 'block'; // Initially visible (expanded)
+  
   // Create color info
   const totalColors = Object.keys(colorCounts).length;
   const totalCount = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
@@ -489,7 +493,6 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   info.style.marginBottom = '8px';
   info.style.color = '#666';
   
-  colorPanelElement.appendChild(titleContainer);
   colorPanelElement.appendChild(info);
   
   // Create color buttons container
@@ -573,6 +576,10 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   
   colorPanelElement.appendChild(colorButtonsContainer);
   
+  // Add elements to wrapper
+  colorPanelWrapper.appendChild(titleContainer);
+  colorPanelWrapper.appendChild(colorPanelElement);
+  
   // Add toggle functionality to title
   title.addEventListener('click', (e) => {
     // Toggle visibility of color buttons container
@@ -595,7 +602,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   
   // Add color panel to control panel
   if (controlPanelElement) {
-    controlPanelElement.appendChild(colorPanelElement);
+    controlPanelElement.appendChild(colorPanelWrapper);
   }
 };
 
