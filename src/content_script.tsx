@@ -390,29 +390,45 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
     colorPanelElement.remove();
   }
   
-  // Create color panel
+  // Create color panel container
   colorPanelElement = document.createElement('div');
   colorPanelElement.id = 'wplace-professor-color-panel';
-  colorPanelElement.style.position = 'fixed';
-  colorPanelElement.style.bottom = '20px';
-  colorPanelElement.style.right = '20px';
-  colorPanelElement.style.zIndex = '99999';
-  colorPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-  colorPanelElement.style.padding = '15px';
-  colorPanelElement.style.borderRadius = '8px';
-  colorPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-  colorPanelElement.style.fontFamily = 'Arial, sans-serif';
-  colorPanelElement.style.minWidth = '200px';
-  colorPanelElement.style.maxHeight = '300px';
+  colorPanelElement.style.marginTop = '15px';
+  colorPanelElement.style.padding = '10px';
+  colorPanelElement.style.border = '1px solid #ddd';
+  colorPanelElement.style.borderRadius = '4px';
+  colorPanelElement.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
+  colorPanelElement.style.maxHeight = '200px';
   colorPanelElement.style.overflowY = 'auto';
+  colorPanelElement.style.display = 'none'; // Initially hidden
   
-  // Create color panel title
-  const title = document.createElement('h3');
+  // Create color panel title with toggle button
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '10px';
+  titleContainer.style.cursor = 'pointer';
+  
+  const title = document.createElement('h4');
   title.textContent = 'Color Palette';
-  title.style.margin = '0 0 10px 0';
-  title.style.fontSize = '16px';
+  title.style.margin = '0';
+  title.style.fontSize = '14px';
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
+  
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '▼'; // Down arrow for expand
+  toggleButton.style.background = 'none';
+  toggleButton.style.border = 'none';
+  toggleButton.style.fontSize = '12px';
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.padding = '2px 6px';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.backgroundColor = '#e0e0e0';
+  
+  titleContainer.appendChild(title);
+  titleContainer.appendChild(toggleButton);
   
   // Create color info
   const totalColors = Object.keys(colorCounts).length;
@@ -420,12 +436,16 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   
   const info = document.createElement('div');
   info.textContent = `Colors: ${totalColors}, Total blocks: ${totalCount}`;
-  info.style.fontSize = '12px';
+  info.style.fontSize = '11px';
   info.style.marginBottom = '10px';
   info.style.color = '#666';
   
-  colorPanelElement.appendChild(title);
+  colorPanelElement.appendChild(titleContainer);
   colorPanelElement.appendChild(info);
+  
+  // Create color buttons container
+  const colorButtonsContainer = document.createElement('div');
+  colorButtonsContainer.id = 'color-buttons-container';
   
   // Create color buttons
   for (const [color, count] of Object.entries(colorCounts)) {
@@ -467,7 +487,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
     // Add click event to filter by this color
     colorButton.addEventListener('click', () => {
       // Highlight selected color
-      const allButtons = colorPanelElement?.querySelectorAll('div[style*="flex"]');
+      const allButtons = colorButtonsContainer.querySelectorAll('div[style*="flex"]');
       allButtons?.forEach(btn => {
         (btn as HTMLElement).style.fontWeight = 'normal';
       });
@@ -476,9 +496,6 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
       // Store current color filter
       (window as any).currentColorFilter = color;
       
-      // Get current scale from the zoom slider
-      const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
-      
       // Redraw canvas with only this color
       const canvas = overlayElement?.querySelector('canvas');
       if (canvas) {
@@ -486,6 +503,8 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
         if (ctx) {
           const img = new Image();
           img.onload = function() {
+            // Get current scale from the zoom slider
+            const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
             redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, color);
           };
           img.src = (window as any).currentPixelArtDataUrl || '';
@@ -496,10 +515,37 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
       tryClickColorButtonInAt5(color);
     });
     
-    colorPanelElement.appendChild(colorButton);
+    colorButtonsContainer.appendChild(colorButton);
   }
   
-  document.body.appendChild(colorPanelElement);
+  colorPanelElement.appendChild(colorButtonsContainer);
+  
+  // Add toggle functionality
+  titleContainer.addEventListener('click', (e) => {
+    if (e.target !== toggleButton) {
+      // Toggle visibility of color buttons container
+      if (colorPanelElement) {
+        const display = colorPanelElement.style.display;
+        colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
+        toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
+      }
+    }
+  });
+  
+  toggleButton.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent triggering the title container click event
+    // Toggle visibility of color buttons container
+    if (colorPanelElement) {
+      const display = colorPanelElement.style.display;
+      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
+      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
+    }
+  });
+  
+  // Add color panel to control panel
+  if (controlPanelElement) {
+    controlPanelElement.appendChild(colorPanelElement);
+  }
 };
 
 // Function to try clicking the corresponding color button in @5.txt
