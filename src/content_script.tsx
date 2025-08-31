@@ -417,6 +417,53 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
   
+  // Create buttons container for toggle and clear buttons
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.gap = '4px';
+  
+  // Create clear selection button
+  const clearButton = document.createElement('button');
+  clearButton.textContent = '✕'; // X symbol for clear
+  clearButton.style.background = 'none';
+  clearButton.style.border = 'none';
+  clearButton.style.fontSize = '12px';
+  clearButton.style.cursor = 'pointer';
+  clearButton.style.padding = '2px 6px';
+  clearButton.style.borderRadius = '3px';
+  clearButton.style.backgroundColor = '#e0e0e0';
+  clearButton.title = 'Clear color selection';
+  
+  // Add click event to clear color selection
+  clearButton.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent triggering the title container click event
+    
+    // Clear any existing color filter
+    (window as any).currentColorFilter = null;
+    
+    // Remove highlight from all color buttons
+    const allButtons = colorPanelElement?.querySelectorAll('div[style*="flex"]');
+    allButtons?.forEach(btn => {
+      (btn as HTMLElement).style.fontWeight = 'normal';
+    });
+    
+    // Redraw canvas with all colors
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = new Image();
+        img.onload = function() {
+          // Get current scale from the zoom slider
+          const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
+          const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, null);
+        };
+        img.src = (window as any).currentPixelArtDataUrl || '';
+      }
+    }
+  });
+  
   const toggleButton = document.createElement('button');
   toggleButton.textContent = '▲'; // Up arrow for collapse (default expanded)
   toggleButton.style.background = 'none';
@@ -427,8 +474,10 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   toggleButton.style.borderRadius = '3px';
   toggleButton.style.backgroundColor = '#e0e0e0';
   
+  buttonsContainer.appendChild(clearButton);
+  buttonsContainer.appendChild(toggleButton);
   titleContainer.appendChild(title);
-  titleContainer.appendChild(toggleButton);
+  titleContainer.appendChild(buttonsContainer);
   
   // Create color info
   const totalColors = Object.keys(colorCounts).length;
@@ -526,13 +575,11 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   
   // Add toggle functionality
   titleContainer.addEventListener('click', (e) => {
-    if (e.target !== toggleButton) {
-      // Toggle visibility of color buttons container
-      if (colorPanelElement) {
-        const display = colorPanelElement.style.display;
-        colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
-        toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
-      }
+    // Toggle visibility of color buttons container
+    if (colorPanelElement) {
+      const display = colorPanelElement.style.display;
+      colorPanelElement.style.display = display === 'none' ? 'block' : 'none';
+      toggleButton.textContent = display === 'none' ? '▲' : '▼'; // Up arrow for collapse, down for expand
     }
   });
   
@@ -783,10 +830,9 @@ const placeOverlay = (dataUrl: string) => {
   
   // Create direction buttons container
   const directionButtonsContainer = document.createElement('div');
-  directionButtonsContainer.style.display = 'grid';
-  directionButtonsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
-  directionButtonsContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
-  directionButtonsContainer.style.gap = '3px';
+  directionButtonsContainer.style.display = 'flex';
+  directionButtonsContainer.style.justifyContent = 'center';
+  directionButtonsContainer.style.gap = '4px';
   directionButtonsContainer.style.marginBottom = '8px';
   
   // Create direction buttons
@@ -795,48 +841,49 @@ const placeOverlay = (dataUrl: string) => {
   upBtn.style.background = '#e0e0e0';
   upBtn.style.border = '1px solid #ccc';
   upBtn.style.borderRadius = '3px';
-  upBtn.style.padding = '4px';
+  upBtn.style.padding = '4px 8px';
   upBtn.style.cursor = 'pointer';
   upBtn.style.fontSize = '12px';
   upBtn.style.fontWeight = 'bold';
-  upBtn.style.gridRow = '1';
-  upBtn.style.gridColumn = '2';
+  upBtn.style.minWidth = '30px';
   
   const leftBtn = document.createElement('button');
   leftBtn.textContent = '←';
   leftBtn.style.background = '#e0e0e0';
   leftBtn.style.border = '1px solid #ccc';
   leftBtn.style.borderRadius = '3px';
-  leftBtn.style.padding = '4px';
+  leftBtn.style.padding = '4px 8px';
   leftBtn.style.cursor = 'pointer';
   leftBtn.style.fontSize = '12px';
   leftBtn.style.fontWeight = 'bold';
-  leftBtn.style.gridRow = '2';
-  leftBtn.style.gridColumn = '1';
-  
-  const rightBtn = document.createElement('button');
-  rightBtn.textContent = '→';
-  rightBtn.style.background = '#e0e0e0';
-  rightBtn.style.border = '1px solid #ccc';
-  rightBtn.style.borderRadius = '3px';
-  rightBtn.style.padding = '4px';
-  rightBtn.style.cursor = 'pointer';
-  rightBtn.style.fontSize = '12px';
-  rightBtn.style.fontWeight = 'bold';
-  rightBtn.style.gridRow = '2';
-  rightBtn.style.gridColumn = '3';
+  leftBtn.style.minWidth = '30px';
   
   const downBtn = document.createElement('button');
   downBtn.textContent = '↓';
   downBtn.style.background = '#e0e0e0';
   downBtn.style.border = '1px solid #ccc';
   downBtn.style.borderRadius = '3px';
-  downBtn.style.padding = '4px';
+  downBtn.style.padding = '4px 8px';
   downBtn.style.cursor = 'pointer';
   downBtn.style.fontSize = '12px';
   downBtn.style.fontWeight = 'bold';
-  downBtn.style.gridRow = '3';
-  downBtn.style.gridColumn = '2';
+  downBtn.style.minWidth = '30px';
+  
+  const rightBtn = document.createElement('button');
+  rightBtn.textContent = '→';
+  rightBtn.style.background = '#e0e0e0';
+  rightBtn.style.border = '1px solid #ccc';
+  rightBtn.style.borderRadius = '3px';
+  rightBtn.style.padding = '4px 8px';
+  rightBtn.style.cursor = 'pointer';
+  rightBtn.style.fontSize = '12px';
+  rightBtn.style.fontWeight = 'bold';
+  rightBtn.style.minWidth = '30px';
+  
+  directionButtonsContainer.appendChild(upBtn);
+  directionButtonsContainer.appendChild(leftBtn);
+  directionButtonsContainer.appendChild(downBtn);
+  directionButtonsContainer.appendChild(rightBtn);
   
   directionButtonsContainer.appendChild(upBtn);
   directionButtonsContainer.appendChild(leftBtn);
