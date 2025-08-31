@@ -14,24 +14,6 @@ interface PaletteColor {
   count: number; // Pixel count for this color
 }
 
-// Type for the Pixelit class (defined in pixelit.d.ts)
-declare class Pixelit {
-  constructor(config: {
-    to?: string | HTMLCanvasElement;
-    from?: string | HTMLImageElement;
-    scale?: number;
-    palette?: string[];
-    maxHeight?: number;
-    maxWidth?: number;
-  });
-  sendImageToCanvas(): Pixelit;
-  pixelate(): Pixelit;
-  convertPalette(): Pixelit;
-  draw(): Pixelit;
-  getColorCount(): Map<string, number>;
-  getCanvas(): HTMLCanvasElement;
-}
-
 // Helper function to convert RGB array to RGB string
 const rgbArrayToString = (rgb: number[]): string => {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
@@ -45,6 +27,7 @@ const SidePanel = () => {
   const [isPlacingOverlay, setIsPlacingOverlay] = useState(false);
   const [isPixelitLoaded, setIsPixelitLoaded] = useState(false);
   const [pixelScale, setPixelScale] = useState<number>(8); // Default scale value
+  const [scaledImageDataUrl, setScaledImageDataUrl] = useState<string | null>(null); // 存储缩小并应用调色板处理后的图像数据
   // Remove isConverting state variable
   
   // Refs for DOM elements
@@ -361,29 +344,129 @@ const SidePanel = () => {
         return;
       }
 
-      // Configure and run pixelit
-      // @ts-ignore
-      const px = new PixelitClass({
-        from: imageRef.current,
-        to: canvasRef.current,
-        palette: selectedPalette,
-        scale: pixelScale, // Use the pixelScale state
-        maxHeight: 100, // TODO: Make configurable
-        maxWidth: 100  // TODO: Make configurable
-      });
+      // Custom pixelation logic without using pixelit.js
+      // Step 1: Pixelate the image by scaling down
+      // Create a temporary canvas for scaling down
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
       
-      // Check if the required methods exist
-      if (typeof px.draw !== 'function' || 
-          typeof px.pixelate !== 'function' || 
-          typeof px.convertPalette !== 'function') {
-        console.error('pixelit instance does not have the required methods:', px);
-        return;
+      // Disable image smoothing for pixel-perfect scaling
+      (tempCtx as any).mozImageSmoothingEnabled = false;
+      (tempCtx as any).webkitImageSmoothingEnabled = false;
+      tempCtx.imageSmoothingEnabled = false;
+      
+      // Calculate scaled dimensions
+      const scaledWidth = Math.max(1, Math.round(imageRef.current.naturalWidth * pixelScale * 0.01));
+      const scaledHeight = Math.max(1, Math.round(imageRef.current.naturalHeight * pixelScale * 0.01));
+      
+      // Set temp canvas dimensions
+      tempCanvas.width = scaledWidth;
+      tempCanvas.height = scaledHeight;
+      
+      // Draw scaled down image
+      tempCtx.drawImage(imageRef.current, 0, 0, scaledWidth, scaledHeight);
+      
+      // Step 2: Apply color palette conversion to the scaled down image
+      const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const scaledData = scaledImageData.data;
+      
+      // Function to calculate color similarity
+      const colorSim = (rgbColor: number[], compareColor: number[]): number => {
+        let d = 0;
+        for (let i = 0; i < rgbColor.length; i++) {
+          d += (rgbColor[i] - compareColor[i]) * (rgbColor[i] - compareColor[i]);
+        }
+        return Math.sqrt(d);
+      };
+      
+      // Function to find the most similar color in the palette
+      const similarColor = (actualColor: number[]): number[] => {
+        if (selectedPalette.length === 0) return actualColor;
+        
+        let selectedColor = selectedPalette[0];
+        let currentSim = colorSim(actualColor, selectedPalette[0]);
+        
+        for (const color of selectedPalette) {
+          const nextColor = colorSim(actualColor, color);
+          if (nextColor <= currentSim) {
+            selectedColor = color;
+            currentSim = nextColor;
+          }
+        }
+        return selectedColor;
+      };
+      
+      // Apply palette conversion to each pixel in the scaled image
+      for (let y = 0; y < scaledImageData.height; y++) {
+        for (let x = 0; x < scaledImageData.width; x++) {
+          const i = y * 4 * scaledImageData.width + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+          
+          // Skip transparent pixels
+          if (a === 0) continue;
+          
+          // Find the most similar color in the palette
+          const originalColor = [r, g, b];
+          const finalColor = similarColor(originalColor);
+          
+          // Apply the final color
+          scaledData[i] = finalColor[0];
+          scaledData[i + 1] = finalColor[1];
+          scaledData[i + 2] = finalColor[2];
+        }
       }
       
-      // 使用正确的 API 调用顺序
-      px.draw()
-        .pixelate()
-        .convertPalette();
+      // Put the modified image data back to the temp canvas
+      tempCtx.putImageData(scaledImageData, 0, 0);
+      
+      // 直接使用已经处理好的缩小图像数据
+      // 获取缩小并应用调色板处理后的图像数据 URL
+      const scaledImageDataUrl = tempCanvas.toDataURL();
+      
+      // Step 3: Scale back up to original size by manually expanding each pixel
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+      
+      // Calculate the upscale ratio
+      const upscaleRatioX = imageRef.current.naturalWidth / scaledWidth;
+      const upscaleRatioY = imageRef.current.naturalHeight / scaledHeight;
+      
+      // Set canvas dimensions to match original image
+      canvasRef.current.width = imageRef.current.naturalWidth;
+      canvasRef.current.height = imageRef.current.naturalHeight;
+      
+      // Clear main canvas
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      
+      // Manually expand each pixel from the scaled image
+      for (let y = 0; y < scaledHeight; y++) {
+        for (let x = 0; x < scaledWidth; x++) {
+          const i = y * 4 * scaledWidth + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+          
+          // Skip transparent pixels
+          if (a === 0) continue;
+          
+          // Calculate the position and size of the expanded pixel using precise calculation
+          const pixelX = Math.floor(x * upscaleRatioX);
+          const pixelY = Math.floor(y * upscaleRatioY);
+          const nextPixelX = Math.floor((x + 1) * upscaleRatioX);
+          const nextPixelY = Math.floor((y + 1) * upscaleRatioY);
+          const pixelWidth = nextPixelX - pixelX;
+          const pixelHeight = nextPixelY - pixelY;
+          
+          // Fill the expanded pixel
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
+        }
+      }
       
       // 获取颜色统计信息
       // 使用 Canvas API 直接获取颜色统计信息
@@ -422,6 +505,8 @@ const SidePanel = () => {
           // Get the result
           const dataUrl = canvasRef.current.toDataURL();
           setPixelArtDataUrl(dataUrl);
+          // 存储缩小并应用调色板处理后的图像数据
+          setScaledImageDataUrl(scaledImageDataUrl);
         }
         
         // 发送颜色统计信息到content script
@@ -448,6 +533,22 @@ const SidePanel = () => {
     // 从window对象获取颜色统计信息
     const colorCounts = (window as any).pixelArtColorCounts || {};
     
+    // Get selected colors for the palette
+    const selectedPalette = paletteColors
+      .filter(pc => pc.isSelected)
+      .map(pc => pc.colorInfo.rgbValue)
+      .filter(rgb => rgb !== "undefined") // Exclude transparent
+      .map(rgbString => {
+        // Convert "rgb(r, g, b)" string to [r, g, b] array
+        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+          return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+        }
+        // Fallback: return black if parsing fails
+        console.warn("Failed to parse RGB string:", rgbString);
+        return [0, 0, 0];
+      });
+    
     // Send message to content script to prepare for overlay placement
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const activeTab = tabs[0];
@@ -457,8 +558,10 @@ const SidePanel = () => {
           { 
             action: "prepareForOverlayPlacement",
             pixelArtDataUrl: pixelArtDataUrl,
+            scaledImageDataUrl: scaledImageDataUrl, // 使用scaledImageDataUrl中存储的图像数据
             colorCounts: colorCounts,
-            pixelScale: pixelScale  // Add pixelScale to the message
+            pixelScale: pixelScale,  // Add pixelScale to the message
+            palette: selectedPalette  // Add selected palette to the message
           },
           (response) => {
             if (chrome.runtime.lastError) {
