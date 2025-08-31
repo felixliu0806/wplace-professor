@@ -400,7 +400,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   colorPanelElement.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
   colorPanelElement.style.maxHeight = '200px';
   colorPanelElement.style.overflowY = 'auto';
-  colorPanelElement.style.display = 'none'; // Initially hidden
+  colorPanelElement.style.display = 'block'; // Initially visible (expanded)
   
   // Create color panel title with toggle button
   const titleContainer = document.createElement('div');
@@ -418,7 +418,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
   title.style.color = '#333';
   
   const toggleButton = document.createElement('button');
-  toggleButton.textContent = '▼'; // Down arrow for expand
+  toggleButton.textContent = '▲'; // Up arrow for collapse (default expanded)
   toggleButton.style.background = 'none';
   toggleButton.style.border = 'none';
   toggleButton.style.fontSize = '12px';
