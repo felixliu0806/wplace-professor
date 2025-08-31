@@ -114,6 +114,13 @@ const drawPixelBlock = (
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, blockSize, blockSize);
   
+  // For very small blocks, just fill with the color
+  if (blockSize <= 3) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, blockSize, blockSize);
+    return;
+  }
+  
   // Calculate padding (10% of blockSize for padding on each side)
   const padding = Math.max(1, Math.floor(blockSize * 0.1));
   
@@ -141,9 +148,87 @@ const drawPixelBlock = (
 
 // Function to redraw canvas with color blocks and borders
 const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, pixelScale: number, scale: number, colorFilter: string | null = null) => {
-  // Get palette from window object
+  // Get palette and original image dimensions from window object
   const palette = (window as any).currentPalette || [];
+  const originalImageWidth = (window as any).originalImageWidth || img.naturalWidth;
+  const originalImageHeight = (window as any).originalImageHeight || img.naturalHeight;
+  const scaledImageDataUrl = (window as any).currentScaledImageDataUrl || null;
   
+  // If we have scaled image data, use it directly
+  if (scaledImageDataUrl) {
+    const scaledImg = new Image();
+    scaledImg.onload = function() {
+      // Create a temporary canvas for processing
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+      
+      // Draw the scaled image
+      tempCanvas.width = scaledImg.naturalWidth;
+      tempCanvas.height = scaledImg.naturalHeight;
+      tempCtx.drawImage(scaledImg, 0, 0);
+      
+      // Get image data
+      const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const scaledData = scaledImageData.data;
+      
+      // Now draw each pixel as a block with border, padding, and center color
+      // Create another temporary canvas for the block drawing
+      const blockCanvas = document.createElement('canvas');
+      const blockCtx = blockCanvas.getContext('2d');
+      if (!blockCtx) return;
+      
+      // blockSize is the size of each pixel block in the final display
+      // It's the ratio between original and scaled dimensions
+      const pixelWidthRatio = originalImageWidth / scaledImg.naturalWidth;
+      const blockSize = Math.round(pixelWidthRatio * scale);
+      
+      blockCanvas.width = Math.round(originalImageWidth * scale);
+      blockCanvas.height = Math.round(originalImageHeight * scale);
+      
+      // Draw each pixel as a block, optionally filtered by color
+      for (let y = 0; y < scaledImg.naturalHeight; y++) {
+        for (let x = 0; x < scaledImg.naturalWidth; x++) {
+          const i = y * 4 * scaledImg.naturalWidth + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+          
+          // Skip transparent pixels
+          if (a === 0) continue;
+          
+          const color = `rgb(${r},${g},${b})`;
+          
+          // If a color filter is applied and this pixel doesn't match, skip it
+          if (colorFilter && color !== colorFilter) {
+            continue;
+          }
+          
+          // Draw pixel block with border, padding, and center color
+          const blockX = x * blockSize;
+          const blockY = y * blockSize;
+          
+          drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+        }
+      }
+      
+      // Draw border around the entire image
+      blockCtx.strokeStyle = '#000000';
+      blockCtx.lineWidth = 2;
+      blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+      
+      // Copy the block image to the main canvas
+      canvas.width = blockCanvas.width;
+      canvas.height = blockCanvas.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(blockCanvas, 0, 0);
+    };
+    scaledImg.src = scaledImageDataUrl;
+    return;
+  }
+  
+  // Fallback to the original processing if no scaled image data is available
   // Custom pixelation logic without using pixelit.js
   // Step 1: Draw the image to the canvas
   canvas.width = img.naturalWidth;
@@ -248,10 +333,13 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
   const blockCtx = blockCanvas.getContext('2d');
   if (!blockCtx) return;
   
-  // Set block canvas dimensions
-  const blockSize = 100 * scale;
-  blockCanvas.width = scaledWidth * blockSize;
-  blockCanvas.height = scaledHeight * blockSize;
+  // blockSize is the size of each pixel block in the final display
+  // It's the ratio between original and scaled dimensions
+  const pixelWidthRatio = originalImageWidth / scaledWidth;
+  const blockSize = Math.round(pixelWidthRatio * scale);
+  
+  blockCanvas.width = Math.round(originalImageWidth * scale);
+  blockCanvas.height = Math.round(originalImageHeight * scale);
   
   // Draw each pixel as a block, optionally filtered by color
   for (let y = 0; y < scaledHeight; y++) {
@@ -785,10 +873,15 @@ const placeOverlay = (dataUrl: string) => {
           const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
           const scaledData = scaledImageData.data;
           
-          // Set block canvas dimensions
-          const blockSize = 100;
-          blockCanvas.width = scaledImg.naturalWidth * blockSize;
-          blockCanvas.height = scaledImg.naturalHeight * blockSize;
+          // blockSize is the size of each pixel block in the final display
+          // It's the ratio between original and scaled dimensions
+          const originalImageWidth = (window as any).originalImageWidth || scaledImg.naturalWidth;
+          const originalImageHeight = (window as any).originalImageHeight || scaledImg.naturalHeight;
+          const pixelWidthRatio = originalImageWidth / scaledImg.naturalWidth;
+          const blockSize = Math.round(pixelWidthRatio * 1.0); // Default scale factor of 1.0
+          
+          blockCanvas.width = Math.round(originalImageWidth * 1.0);
+          blockCanvas.height = Math.round(originalImageHeight * 1.0);
           
           // Draw each pixel as a block with border, padding, and center color
           for (let y = 0; y < scaledImg.naturalHeight; y++) {
@@ -1008,10 +1101,15 @@ const placeOverlay = (dataUrl: string) => {
         const blockCtx = blockCanvas.getContext('2d');
         if (!blockCtx) return;
         
-        // Set block canvas dimensions
-        const blockSize = 100;
-        blockCanvas.width = scaledWidth * blockSize;
-        blockCanvas.height = scaledHeight * blockSize;
+        // blockSize is the size of each pixel block in the final display
+        // It's the ratio between original and scaled dimensions
+        const originalImageWidth = (window as any).originalImageWidth || img.naturalWidth;
+        const originalImageHeight = (window as any).originalImageHeight || img.naturalHeight;
+        const pixelWidthRatio = originalImageWidth / scaledWidth;
+        const blockSize = Math.round(pixelWidthRatio * 1.0); // Default scale factor of 1.0
+        
+        blockCanvas.width = Math.round(originalImageWidth * 1.0);
+        blockCanvas.height = Math.round(originalImageHeight * 1.0);
         
         // Draw each pixel as a block with border, padding, and center color
         for (let y = 0; y < scaledHeight; y++) {
@@ -1290,11 +1388,13 @@ const setupMessageListener = () => {
       if (request.pixelArtDataUrl && request.colorCounts) {
         pixelArtDataUrl = request.pixelArtDataUrl;
         colorCounts = request.colorCounts;
-        // Store the pixelScale, pixelArtDataUrl, scaledImageDataUrl, and palette for use in drawing functions
+        // Store the pixelScale, pixelArtDataUrl, scaledImageDataUrl, palette, and original image dimensions for use in drawing functions
         (window as any).currentPixelScale = request.pixelScale || 1;
         (window as any).currentPixelArtDataUrl = request.pixelArtDataUrl;
         (window as any).currentScaledImageDataUrl = request.scaledImageDataUrl || null;
         (window as any).currentPalette = request.palette || [];
+        (window as any).originalImageWidth = request.originalImageWidth || 0;
+        (window as any).originalImageHeight = request.originalImageHeight || 0;
         setupOverlayPlacement();
         sendResponse({ status: "Ready for overlay placement" });
       } else {

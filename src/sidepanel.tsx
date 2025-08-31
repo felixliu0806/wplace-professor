@@ -561,7 +561,9 @@ const SidePanel = () => {
             scaledImageDataUrl: scaledImageDataUrl, // 使用scaledImageDataUrl中存储的图像数据
             colorCounts: colorCounts,
             pixelScale: pixelScale,  // Add pixelScale to the message
-            palette: selectedPalette  // Add selected palette to the message
+            palette: selectedPalette,  // Add selected palette to the message
+            originalImageWidth: imageRef.current?.naturalWidth || 0,  // Add original image width
+            originalImageHeight: imageRef.current?.naturalHeight || 0  // Add original image height
           },
           (response) => {
             if (chrome.runtime.lastError) {
