@@ -107,17 +107,20 @@ const drawPixelBlock = (
   x: number,
   y: number,
   blockSize: number,
-  color: string
+  color: string,
+  drawCenter: boolean = true // Add parameter to control center color drawing
 ) => {
   // Draw the outer border (thin line)
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, blockSize, blockSize);
   
-  // For very small blocks, just fill with the color
+  // For very small blocks, just fill with the color if drawing center
   if (blockSize <= 3) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, blockSize, blockSize);
+    if (drawCenter) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, blockSize, blockSize);
+    }
     return;
   }
   
@@ -133,15 +136,17 @@ const drawPixelBlock = (
     ctx.fillStyle = '#f0f0f0'; // Light gray for padding area
     ctx.fillRect(innerX, innerY, innerSize, innerSize);
     
-    // Draw the center color area (80% of blockSize)
-    const centerPadding = Math.max(1, Math.floor(blockSize * 0.15)); // 15% padding for center area
-    const centerX = x + centerPadding;
-    const centerY = y + centerPadding;
-    const centerSize = blockSize - centerPadding * 2;
-    
-    if (centerSize > 0) {
-      ctx.fillStyle = color;
-      ctx.fillRect(centerX, centerY, centerSize, centerSize);
+    // Draw the center color area (80% of blockSize) only if drawCenter is true
+    if (drawCenter) {
+      const centerPadding = Math.max(1, Math.floor(blockSize * 0.15)); // 15% padding for center area
+      const centerX = x + centerPadding;
+      const centerY = y + centerPadding;
+      const centerSize = blockSize - centerPadding * 2;
+      
+      if (centerSize > 0) {
+        ctx.fillStyle = color;
+        ctx.fillRect(centerX, centerY, centerSize, centerSize);
+      }
     }
   }
 };
@@ -200,23 +205,20 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
           
           const color = `rgb(${r},${g},${b})`;
           
-          // If a color filter is applied and this pixel doesn't match, skip it
-          if (colorFilter && color !== colorFilter) {
-            continue;
-          }
-          
           // Draw pixel block with border, padding, and center color
           const blockX = x * blockSize;
           const blockY = y * blockSize;
           
-          drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+          // If a color filter is applied, only draw the center for matching colors
+          const drawCenter = !colorFilter || color === colorFilter;
+          drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, drawCenter);
         }
       }
       
-      // Draw border around the entire image
-      blockCtx.strokeStyle = '#000000';
-      blockCtx.lineWidth = 2;
-      blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+      // Removed: Draw border around the entire image
+      // blockCtx.strokeStyle = '#000000';
+      // blockCtx.lineWidth = 2;
+      // blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
       
       // Copy the block image to the main canvas
       canvas.width = blockCanvas.width;
@@ -364,14 +366,15 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
       const blockX = x * blockSize;
       const blockY = y * blockSize;
       
-      drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+      // Always draw the full pixel block structure in this section (no color filter)
+      drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, true);
     }
   }
   
   // Draw border around the entire image
-  blockCtx.strokeStyle = '#000000';
-  blockCtx.lineWidth = 2;
-  blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+  // blockCtx.strokeStyle = '#000000';
+  // blockCtx.lineWidth = 2;
+  // blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
   
   // Copy the block image to the main canvas
   canvas.width = blockCanvas.width;
@@ -473,6 +476,9 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
       // Store current color filter
       (window as any).currentColorFilter = color;
       
+      // Get current scale from the zoom slider
+      const currentScale = parseFloat((document.getElementById('zoom-slider') as HTMLInputElement)?.value) || 1.0;
+      
       // Redraw canvas with only this color
       const canvas = overlayElement?.querySelector('canvas');
       if (canvas) {
@@ -480,7 +486,7 @@ const createColorPanel = (colorCounts: {[key: string]: number}, pixelScale: numb
         if (ctx) {
           const img = new Image();
           img.onload = function() {
-            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, 1.0, color);
+            redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, color);
           };
           img.src = (window as any).currentPixelArtDataUrl || '';
         }
@@ -683,7 +689,7 @@ const placeOverlay = (dataUrl: string) => {
   zoomSlider.type = 'range';
   zoomSlider.id = 'zoom-slider';
   zoomSlider.min = '0.1';
-  zoomSlider.max = '5.0';
+  zoomSlider.max = '15.0'; // Increased from 5.0 to 15.0
   zoomSlider.step = '0.01';
   zoomSlider.value = '1.0';
   zoomSlider.style.width = '100%';
@@ -901,14 +907,15 @@ const placeOverlay = (dataUrl: string) => {
               const blockX = x * blockSize;
               const blockY = y * blockSize;
               
-              drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+              // Always draw the full pixel block structure in this section (no color filter)
+              drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, true);
             }
           }
           
           // Draw border around the entire image
-          blockCtx.strokeStyle = '#000000';
-          blockCtx.lineWidth = 2;
-          blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+          // blockCtx.strokeStyle = '#000000';
+          // blockCtx.lineWidth = 2;
+          // blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
           
           // Copy the block image to the main canvas
           canvas.width = blockCanvas.width;
@@ -964,7 +971,7 @@ const placeOverlay = (dataUrl: string) => {
           zoomInBtn.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent dragging
             const currentScale = parseFloat(zoomSlider.value);
-            const newScale = Math.min(currentScale + zoomStep, 5.0);
+            const newScale = Math.min(currentScale + zoomStep, 15.0); // Increased from 5.0 to 15.0
             performZoom(newScale);
           });
           
@@ -1129,14 +1136,15 @@ const placeOverlay = (dataUrl: string) => {
             const blockX = x * blockSize;
             const blockY = y * blockSize;
             
-            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color);
+            // Always draw the full pixel block structure in this section (no color filter)
+            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, true);
           }
         }
         
         // Draw border around the entire image
-        blockCtx.strokeStyle = '#000000';
-        blockCtx.lineWidth = 2;
-        blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
+        // blockCtx.strokeStyle = '#000000';
+        // blockCtx.lineWidth = 2;
+        // blockCtx.strokeRect(0, 0, blockCanvas.width, blockCanvas.height);
         
         // Copy the block image to the main canvas
         canvas.width = blockCanvas.width;
@@ -1192,7 +1200,7 @@ const placeOverlay = (dataUrl: string) => {
         zoomInBtn.addEventListener('click', (e) => {
           e.stopPropagation(); // Prevent dragging
           const currentScale = parseFloat(zoomSlider.value);
-          const newScale = Math.min(currentScale + zoomStep, 5.0);
+          const newScale = Math.min(currentScale + zoomStep, 15.0); // Increased from 5.0 to 15.0
           performZoom(newScale);
         });
         
@@ -1232,11 +1240,15 @@ const placeOverlay = (dataUrl: string) => {
   upBtn.addEventListener('click', () => {
     if (overlayElement) {
       const currentTransform = overlayElement.style.transform;
-      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
       if (translateMatch) {
         const currentX = parseFloat(translateMatch[1]);
         const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate(${currentX}px, ${currentY - moveStep}px)`;
+        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY - moveStep}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(0px, ${-moveStep}px, 0)`;
       }
     }
   });
@@ -1244,11 +1256,15 @@ const placeOverlay = (dataUrl: string) => {
   downBtn.addEventListener('click', () => {
     if (overlayElement) {
       const currentTransform = overlayElement.style.transform;
-      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
       if (translateMatch) {
         const currentX = parseFloat(translateMatch[1]);
         const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate(${currentX}px, ${currentY + moveStep}px)`;
+        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY + moveStep}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(0px, ${moveStep}px, 0)`;
       }
     }
   });
@@ -1256,11 +1272,15 @@ const placeOverlay = (dataUrl: string) => {
   leftBtn.addEventListener('click', () => {
     if (overlayElement) {
       const currentTransform = overlayElement.style.transform;
-      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
       if (translateMatch) {
         const currentX = parseFloat(translateMatch[1]);
         const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate(${currentX - moveStep}px, ${currentY}px)`;
+        overlayElement.style.transform = `translate3d(${currentX - moveStep}px, ${currentY}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(${-moveStep}px, 0px, 0)`;
       }
     }
   });
@@ -1268,11 +1288,15 @@ const placeOverlay = (dataUrl: string) => {
   rightBtn.addEventListener('click', () => {
     if (overlayElement) {
       const currentTransform = overlayElement.style.transform;
-      const translateMatch = currentTransform.match(/translate\(([^,]+)px, ([^,]+)px\)/);
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
       if (translateMatch) {
         const currentX = parseFloat(translateMatch[1]);
         const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate(${currentX + moveStep}px, ${currentY}px)`;
+        overlayElement.style.transform = `translate3d(${currentX + moveStep}px, ${currentY}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(${moveStep}px, 0px, 0)`;
       }
     }
   });
