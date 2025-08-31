@@ -258,7 +258,36 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       // Draw the scaled image
       tempCanvas.width = scaledImg.naturalWidth;
       tempCanvas.height = scaledImg.naturalHeight;
+      
+      // DEBUG: 检查Canvas设置
+      console.log("=== Content Script Canvas设置 ===");
+      console.log("  Canvas尺寸:", tempCanvas.width, "x", tempCanvas.height);
+      console.log("  imageSmoothingEnabled:", tempCtx.imageSmoothingEnabled);
+      console.log("  globalAlpha:", tempCtx.globalAlpha);
+      console.log("  globalCompositeOperation:", tempCtx.globalCompositeOperation);
+      
       tempCtx.drawImage(scaledImg, 0, 0);
+      
+      // DEBUG: 验证绘制后的Canvas内容
+      console.log("=== 绘制后Canvas验证 ===");
+      const verifyImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const verifyData = verifyImageData.data;
+      console.log(`  验证数据长度: ${verifyData.length}`);
+      
+      // 统计前100个像素的颜色
+      const sampleColors = new Set<string>();
+      for (let i = 0; i < Math.min(400, verifyData.length); i += 4) {
+        const r = verifyData[i];
+        const g = verifyData[i + 1];
+        const b = verifyData[i + 2];
+        const a = verifyData[i + 3];
+        if (a !== 0) {
+          const color = `rgb(${r},${g},${b})`;
+          sampleColors.add(color);
+        }
+      }
+      console.log(`  前100个像素中的颜色种类: ${sampleColors.size}`);
+      console.log(`  前5个样本颜色:`, Array.from(sampleColors).slice(0, 5));
 
       // Get image data
       const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
@@ -1089,25 +1118,28 @@ const removeOverlay = () => {
 
 // Helper function to create color panel with calculated color counts
 const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: number }, pixelScale: number) => {
-  // DEBUG: 验证颜色统计数据
   console.log("=== Content Script颜色面板创建 ===");
-  console.log(`  接收到的颜色种类数量: ${Object.keys(colorCounts).length}`);
-  
-  // 获取当前调色盘
-  const currentPalette = (window as any).currentPalette || [];
-  console.log("  当前调色盘:", currentPalette);
-  const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
-  
-  // 检查颜色是否在调色盘范围内
-  const outOfPaletteColors = Object.keys(colorCounts).filter(color => !paletteColorsSet.has(color));
-  console.log(`  调色盘外颜色种类数量: ${outOfPaletteColors.length}`);
-  if (outOfPaletteColors.length > 0) {
-    console.warn("  发现调色盘外颜色:", outOfPaletteColors.slice(0, 10)); // 只显示前10个
-  }
-  
-  // 计算总像素数
-  const totalPixels = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
-  console.log(`  总像素数: ${totalPixels}`);
+      console.log(`  接收到的颜色种类数量: ${Object.keys(colorCounts).length}`);
+      
+      // DEBUG: 比较SidePanel和Content Script的调色盘
+      const sidePanelPalette = (window as any).currentPalette || [];
+      console.log("  SidePanel调色盘:", sidePanelPalette);
+      
+      // 获取当前调色盘
+      const currentPalette = (window as any).currentPalette || [];
+      console.log("  当前调色盘:", currentPalette);
+      const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
+      
+      // 检查颜色是否在调色盘范围内
+      const outOfPaletteColors = Object.keys(colorCounts).filter(color => !paletteColorsSet.has(color));
+      console.log(`  调色盘外颜色种类数量: ${outOfPaletteColors.length}`);
+      if (outOfPaletteColors.length > 0) {
+        console.warn("  发现调色盘外颜色:", outOfPaletteColors.slice(0, 10)); // 只显示前10个
+      }
+      
+      // 计算总像素数
+      const totalPixels = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+      console.log(`  总像素数: ${totalPixels}`);
 
   // Create color panel wrapper (always visible)
   const colorPanelWrapper = document.createElement('div');
