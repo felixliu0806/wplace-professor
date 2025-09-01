@@ -475,9 +475,23 @@ Actual: rgb(${verifyData[i]},${verifyData[i+1]},${verifyData[i+2]},${verifyData[
         console.log("✓ putImageData后颜色一致");
       }
 
-      // 直接使用已经处理好的缩小图像数据
       // 获取缩小并应用调色板处理后的图像数据 URL
       const scaledImageDataUrl = tempCanvas.toDataURL();
+      
+      // 创建另一个临时画布来保存缩小但未调色的图像数据
+      const unscaledTempCanvas = document.createElement('canvas');
+      const unscaledTempCtx = unscaledTempCanvas.getContext('2d');
+      if (!unscaledTempCtx) return;
+      
+      // 设置画布尺寸与缩小后的图像相同
+      unscaledTempCanvas.width = scaledWidth;
+      unscaledTempCanvas.height = scaledHeight;
+      
+      // 在缩小但未调色的画布上绘制原始缩小图像
+      unscaledTempCtx.drawImage(tempCanvas, 0, 0);
+      
+      // 获取缩小但未调色的图像数据 URL
+      const unscaledImageDataUrl = unscaledTempCanvas.toDataURL();
       
       // Step 3: Scale back up to original size by manually expanding each pixel
       const ctx = canvasRef.current.getContext('2d');
@@ -601,6 +615,9 @@ Actual: rgb(${verifyData[i]},${verifyData[i+1]},${verifyData[i+2]},${verifyData[
           setScaledImageDataUrl(scaledImageDataUrl);
         }
         
+        // 将缩小但未调色的图像数据存储到状态中
+        (window as any).unscaledImageDataUrl = unscaledImageDataUrl;
+        
         // 发送颜色统计信息到content script
         const colorCounts: { [color: string]: number } = {};
         colorCount.forEach((count: number, color: string) => {
@@ -649,6 +666,7 @@ Actual: rgb(${verifyData[i]},${verifyData[i+1]},${verifyData[i+2]},${verifyData[
             action: "prepareForOverlayPlacement",
             pixelArtDataUrl: pixelArtDataUrl,
             scaledImageDataUrl: scaledImageDataUrl, // 使用scaledImageDataUrl中存储的图像数据
+            unscaledImageDataUrl: (window as any).unscaledImageDataUrl, // 添加缩小但未调色的图像数据
             // 不再传输colorCounts，让Content Script自己计算
             pixelScale: pixelScale,  // Add pixelScale to the message
             palette: selectedPalette,  // Add selected palette to the message

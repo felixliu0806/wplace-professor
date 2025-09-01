@@ -101,6 +101,32 @@ const detectAvailableColors = (): string[] => {
   }
 };
 
+// Function to calculate color similarity
+const colorSim = (rgbColor: number[], compareColor: number[]): number => {
+  let d = 0;
+  for (let i = 0; i < rgbColor.length; i++) {
+    d += (rgbColor[i] - compareColor[i]) * (rgbColor[i] - compareColor[i]);
+  }
+  return Math.sqrt(d);
+};
+
+// Function to find the most similar color in the palette
+const similarColor = (actualColor: number[], selectedPalette: number[][]): number[] => {
+  if (selectedPalette.length === 0) return actualColor;
+  
+  let selectedColor = selectedPalette[0];
+  let currentSim = colorSim(actualColor, selectedPalette[0]);
+  
+  for (const color of selectedPalette) {
+    const nextColor = colorSim(actualColor, color);
+    if (nextColor <= currentSim) {
+      selectedColor = color;
+      currentSim = nextColor;
+    }
+  }
+  return selectedColor;
+};
+
 // Function to draw a pixel block with border, padding, and center color
 const drawPixelBlock = (
   ctx: CanvasRenderingContext2D,
@@ -158,8 +184,16 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
   const originalImageWidth = (window as any).originalImageWidth || img.naturalWidth;
   const originalImageHeight = (window as any).originalImageHeight || img.naturalHeight;
   const scaledImageDataUrl = (window as any).currentScaledImageDataUrl || null;
+  const unscaledImageDataUrl = (window as any).currentUnscaledImageDataUrl || null;
 
-  // If we have scaled image data, use it directly
+  // Always use unscaled image data for color conversion if available, otherwise use scaled image data for display
+  const imageDataUrl = unscaledImageDataUrl || scaledImageDataUrl;
+  if (!imageDataUrl) {
+    console.error("No image data URL available");
+    return;
+  }
+
+  // Load the image data
   const scaledImg = new Image();
   scaledImg.onload = function () {
     // Create a temporary canvas for processing
@@ -175,6 +209,50 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     // Get image data
     const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
     const scaledData = scaledImageData.data;
+
+    // If we have unscaled image data, apply color palette conversion
+    if (unscaledImageDataUrl) {
+      // Function to convert "rgb(r, g, b)" string to [r, g, b] array
+      const rgbStringToArray = (rgbString: string): number[] => {
+        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+          return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+        }
+        // Fallback: return black if parsing fails
+        console.warn("Failed to parse RGB string:", rgbString);
+        return [0, 0, 0];
+      };
+
+      // Get selected palette for color conversion
+      // palette is already an array of RGB arrays, use it directly
+      const selectedPalette = palette;
+      
+      // Apply palette conversion to each pixel in the scaled image
+      for (let y = 0; y < scaledImageData.height; y++) {
+        for (let x = 0; x < scaledImageData.width; x++) {
+          const i = y * 4 * scaledImageData.width + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+          
+          // Skip transparent pixels
+          if (a === 0) continue;
+          
+          // Find the most similar color in the palette
+          const originalColor = [r, g, b];
+          const finalColor = similarColor(originalColor, selectedPalette);
+          
+          // Apply the final color
+          scaledData[i] = finalColor[0];
+          scaledData[i + 1] = finalColor[1];
+          scaledData[i + 2] = finalColor[2];
+        }
+      }
+      
+      // Put the modified image data back to the temp canvas
+      tempCtx.putImageData(scaledImageData, 0, 0);
+    }
 
     // Now draw each pixel as a block with border, padding, and center color
     // Create another temporary canvas for the block drawing
@@ -225,7 +303,7 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(blockCanvas, 0, 0);
   };
-  scaledImg.src = scaledImageDataUrl;
+  scaledImg.src = imageDataUrl;
   return;
 };
 
@@ -293,6 +371,39 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       const scaledData = scaledImageData.data;
 
+      // If we have unscaled image data, apply color palette conversion
+      const unscaledImageDataUrl = (window as any).currentUnscaledImageDataUrl || null;
+      if (unscaledImageDataUrl) {
+        // Get selected palette for color conversion
+        const currentPalette = (window as any).currentPalette || [];
+        
+        // Apply palette conversion to each pixel in the scaled image
+        for (let y = 0; y < scaledImageData.height; y++) {
+          for (let x = 0; x < scaledImageData.width; x++) {
+            const i = y * 4 * scaledImageData.width + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
+            
+            // Skip transparent pixels
+            if (a === 0) continue;
+            
+            // Find the most similar color in the palette
+            const originalColor = [r, g, b];
+            const finalColor = similarColor(originalColor, currentPalette);
+            
+            // Apply the final color
+            scaledData[i] = finalColor[0];
+            scaledData[i + 1] = finalColor[1];
+            scaledData[i + 2] = finalColor[2];
+          }
+        }
+        
+        // Put the modified image data back to the temp canvas
+        tempCtx.putImageData(scaledImageData, 0, 0);
+      }
+
       // Count colors
       const calculatedColorCounts: { [key: string]: number } = {};
       console.log("=== Content Script颜色计算开始 ===");
@@ -301,6 +412,7 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       // 获取当前调色盘
       const currentPalette = (window as any).currentPalette || [];
       console.log("  当前调色盘:", currentPalette);
+      // currentPalette is already an array of RGB arrays, convert to RGB strings
       const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
       
       let outOfPaletteColors = 0;
@@ -712,23 +824,55 @@ const placeOverlay = (dataUrl: string) => {
       // If we have scaled image data, use it directly
       const scaledImg = new Image();
       scaledImg.onload = function () {
+        // Create a temporary canvas for processing
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+
+        // Draw the scaled image
+        tempCanvas.width = scaledImg.naturalWidth;
+        tempCanvas.height = scaledImg.naturalHeight;
+        tempCtx.drawImage(scaledImg, 0, 0);
+
+        // Get image data
+        const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const scaledData = scaledImageData.data;
+
+        // If we have unscaled image data, apply color palette conversion
+        const unscaledImageDataUrl = (window as any).currentUnscaledImageDataUrl || null;
+        if (unscaledImageDataUrl) {
+          // Apply palette conversion to each pixel in the scaled image
+          for (let y = 0; y < scaledImageData.height; y++) {
+            for (let x = 0; x < scaledImageData.width; x++) {
+              const i = y * 4 * scaledImageData.width + x * 4;
+              const r = scaledData[i];
+              const g = scaledData[i + 1];
+              const b = scaledData[i + 2];
+              const a = scaledData[i + 3];
+              
+              // Skip transparent pixels
+              if (a === 0) continue;
+              
+              // Find the most similar color in the palette
+              const originalColor = [r, g, b];
+              const finalColor = similarColor(originalColor, palette);
+              
+              // Apply the final color
+              scaledData[i] = finalColor[0];
+              scaledData[i + 1] = finalColor[1];
+              scaledData[i + 2] = finalColor[2];
+            }
+          }
+          
+          // Put the modified image data back to the temp canvas
+          tempCtx.putImageData(scaledImageData, 0, 0);
+        }
+
         // Draw each pixel as a block with border, padding, and center color
         // Create another temporary canvas for the block drawing
         const blockCanvas = document.createElement('canvas');
         const blockCtx = blockCanvas.getContext('2d');
         if (!blockCtx) return;
-
-        // Get the scaled image data
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        if (!tempCtx) return;
-
-        tempCanvas.width = scaledImg.naturalWidth;
-        tempCanvas.height = scaledImg.naturalHeight;
-        tempCtx.drawImage(scaledImg, 0, 0);
-
-        const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const scaledData = scaledImageData.data;
 
         // blockSize is the size of each pixel block in the final display
         // It's the ratio between original and scaled dimensions
@@ -833,7 +977,7 @@ const placeOverlay = (dataUrl: string) => {
           performZoom(newScale);
         });
       };
-      scaledImg.src = scaledImageDataUrl;
+      scaledImg.src = scaledImageDataUrl || (window as any).currentUnscaledImageDataUrl;
     }
   };
   img.src = dataUrl;
@@ -1040,6 +1184,7 @@ const setupMessageListener = () => {
         (window as any).currentPixelScale = request.pixelScale || 1;
         (window as any).currentPixelArtDataUrl = request.pixelArtDataUrl;
         (window as any).currentScaledImageDataUrl = request.scaledImageDataUrl || null;
+        (window as any).currentUnscaledImageDataUrl = request.unscaledImageDataUrl || null; // 存储缩小但未调色的图像数据
         (window as any).currentPalette = request.palette || [];
         (window as any).originalImageWidth = request.originalImageWidth || 0;
         (window as any).originalImageHeight = request.originalImageHeight || 0;
@@ -1128,6 +1273,7 @@ const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: numb
       // 获取当前调色盘
       const currentPalette = (window as any).currentPalette || [];
       console.log("  当前调色盘:", currentPalette);
+      // currentPalette is already an array of RGB arrays, convert to RGB strings
       const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
       
       // 检查颜色是否在调色盘范围内
