@@ -12,17 +12,23 @@ let isListenerSetUp = false;
 // Function to detect available colors on wplace.live
 const detectAvailableColors = (): string[] => {
   try {
-    console.log('Detecting available colors...');
+    if (__DEV__) {
+      console.log('Detecting available colors...');
+    }
 
     // Directly look for the grid container with specific classes
     const gridContainer = document.querySelector('div.md\\:grid-cols-16.min-\\[100rem\\]\\:grid-cols-32.grid.grid-cols-8.xl\\:grid-cols-32.sm\\:grid-cols-16.gap-0\\.5.sm\\:gap-1');
 
     if (gridContainer) {
-      console.log('Found grid container');
+      if (__DEV__) {
+        console.log('Found grid container');
+      }
 
       // If grid container is found, get all color buttons from it
       const colorButtons = gridContainer.querySelectorAll('button[style*="background"]');
-      console.log('Found color buttons:', colorButtons.length);
+      if (__DEV__) {
+        console.log('Found color buttons:', colorButtons.length);
+      }
 
       const availableColors: string[] = [];
 
@@ -36,29 +42,45 @@ const detectAvailableColors = (): string[] => {
             const rgbMatch = style.match(/background:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
             if (rgbMatch) {
               availableColors.push(rgbMatch[1]);
-              console.log(`Button ${index}: Found color ${rgbMatch[1]}`);
+              if (__DEV__) {
+                console.log(`Button ${index}: Found color ${rgbMatch[1]}`);
+              }
             } else {
-              console.log(`Button ${index}: No color match in style:`, style);
+              if (__DEV__) {
+                console.log(`Button ${index}: No color match in style:`, style);
+              }
             }
           } else {
-            console.log(`Button ${index}: No style attribute`);
+            if (__DEV__) {
+              console.log(`Button ${index}: No style attribute`);
+            }
           }
         } else {
-          console.log(`Button ${index}: Locked (has lock icon)`);
+          if (__DEV__) {
+            console.log(`Button ${index}: Locked (has lock icon)`);
+          }
         }
       });
 
-      console.log('Detected available colors:', availableColors);
+      if (__DEV__) {
+        console.log('Detected available colors:', availableColors);
+      }
       return availableColors;
     } else {
-      console.log('Grid container not found');
+      if (__DEV__) {
+        console.log('Grid container not found');
+      }
       // Let's try to find any grid container as fallback
       const anyGridContainer = document.querySelector('div.grid');
       if (anyGridContainer) {
-        console.log('Found a grid container (fallback):', anyGridContainer);
+        if (__DEV__) {
+          console.log('Found a grid container (fallback):', anyGridContainer);
+        }
         // Try to get color buttons from this fallback container
         const colorButtons = anyGridContainer.querySelectorAll('button[style*="background"]');
-        console.log('Found color buttons (fallback):', colorButtons.length);
+        if (__DEV__) {
+          console.log('Found color buttons (fallback):', colorButtons.length);
+        }
 
         const availableColors: string[] = [];
         colorButtons.forEach((button, index) => {
@@ -71,32 +93,48 @@ const detectAvailableColors = (): string[] => {
               const rgbMatch = style.match(/background:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
               if (rgbMatch) {
                 availableColors.push(rgbMatch[1]);
-                console.log(`Button ${index}: Found color ${rgbMatch[1]} (fallback)`);
+                if (__DEV__) {
+                  console.log(`Button ${index}: Found color ${rgbMatch[1]} (fallback)`);
+                }
               } else {
-                console.log(`Button ${index}: No color match in style (fallback):`, style);
+                if (__DEV__) {
+                  console.log(`Button ${index}: No color match in style (fallback):`, style);
+                }
               }
             } else {
-              console.log(`Button ${index}: No style attribute (fallback)`);
+              if (__DEV__) {
+                console.log(`Button ${index}: No style attribute (fallback)`);
+              }
             }
           } else {
-            console.log(`Button ${index}: Locked (has lock icon) (fallback)`);
+            if (__DEV__) {
+              console.log(`Button ${index}: Locked (has lock icon) (fallback)`);
+            }
           }
         });
 
-        console.log('Detected available colors (fallback):', availableColors);
+        if (__DEV__) {
+          console.log('Detected available colors (fallback):', availableColors);
+        }
         return availableColors;
       } else {
-        console.log('No grid container found at all');
+        if (__DEV__) {
+          console.log('No grid container found at all');
+        }
       }
     }
 
     // Fallback: If specific container or grid container is not found, 
     // or if we want to default to free palette, return an empty array
     // The SidePanel will handle the fallback to free palette
-    console.log('Grid container not found, returning empty array for fallback to free palette');
+    if (__DEV__) {
+      console.log('Grid container not found, returning empty array for fallback to free palette');
+    }
     return [];
   } catch (error) {
-    console.error('Error detecting available colors:', error);
+    if (__DEV__) {
+      console.error('Error detecting available colors:', error);
+    }
     return [];
   }
 };
@@ -215,7 +253,9 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
   // Always use unscaled image data for color conversion if available, otherwise use scaled image data for display
   const imageDataUrl = unscaledImageDataUrl || scaledImageDataUrl;
   if (!imageDataUrl) {
-    console.error("No image data URL available");
+    if (__DEV__) {
+      console.error("No image data URL available");
+    }
     return;
   }
 
@@ -237,48 +277,50 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     const scaledData = scaledImageData.data;
 
     // If we have unscaled image data, apply color palette conversion
-    if (unscaledImageDataUrl) {
-      // Function to convert "rgb(r, g, b)" string to [r, g, b] array
-      const rgbStringToArray = (rgbString: string): number[] => {
-        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        if (match) {
-          return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
-        }
-        // Fallback: return black if parsing fails
-        console.warn("Failed to parse RGB string:", rgbString);
-        return [0, 0, 0];
-      };
-
-      // Get selected palette for color conversion
-      // palette is already an array of RGB arrays, use it directly
-      const selectedPalette = palette;
-      
-      // Apply palette conversion to each pixel in the scaled image
-      for (let y = 0; y < scaledImageData.height; y++) {
-        for (let x = 0; x < scaledImageData.width; x++) {
-          const i = y * 4 * scaledImageData.width + x * 4;
-          const r = scaledData[i];
-          const g = scaledData[i + 1];
-          const b = scaledData[i + 2];
-          const a = scaledData[i + 3];
-          
-          // Skip transparent pixels
-          if (a === 0) continue;
-          
-          // Find the most similar color in the palette
-          const originalColor = [r, g, b];
-          const finalColor = similarColor(originalColor, selectedPalette);
-          
-          // Apply the final color
-          scaledData[i] = finalColor[0];
-          scaledData[i + 1] = finalColor[1];
-          scaledData[i + 2] = finalColor[2];
-        }
+  if (unscaledImageDataUrl) {
+    // Function to convert "rgb(r, g, b)" string to [r, g, b] array
+    const rgbStringToArray = (rgbString: string): number[] => {
+      const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (match) {
+        return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
       }
-      
-      // Put the modified image data back to the temp canvas
-      tempCtx.putImageData(scaledImageData, 0, 0);
+      // Fallback: return black if parsing fails
+      if (__DEV__) {
+        console.warn("Failed to parse RGB string:", rgbString);
+      }
+      return [0, 0, 0];
+    };
+
+    // Get selected palette for color conversion
+    // palette is already an array of RGB arrays, use it directly
+    const selectedPalette = palette;
+    
+    // Apply palette conversion to each pixel in the scaled image
+    for (let y = 0; y < scaledImageData.height; y++) {
+      for (let x = 0; x < scaledImageData.width; x++) {
+        const i = y * 4 * scaledImageData.width + x * 4;
+        const r = scaledData[i];
+        const g = scaledData[i + 1];
+        const b = scaledData[i + 2];
+        const a = scaledData[i + 3];
+        
+        // Skip transparent pixels
+        if (a === 0) continue;
+        
+        // Find the most similar color in the palette
+        const originalColor = [r, g, b];
+        const finalColor = similarColor(originalColor, selectedPalette);
+        
+        // Apply the final color
+        scaledData[i] = finalColor[0];
+        scaledData[i + 1] = finalColor[1];
+        scaledData[i + 2] = finalColor[2];
+      }
     }
+    
+    // Put the modified image data back to the temp canvas
+    tempCtx.putImageData(scaledImageData, 0, 0);
+  }
 
     // Now draw each pixel as a block with border, padding, and center color
     // Create another temporary canvas for the block drawing
@@ -348,7 +390,9 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
     // Get the scaled image data URL from window object
     const scaledImageDataUrl = (window as any).currentScaledImageDataUrl;
     if (!scaledImageDataUrl) {
-      console.error("No scaled image data URL available for color counting");
+      if (__DEV__) {
+        console.error("No scaled image data URL available for color counting");
+      }
       return;
     }
 
@@ -365,34 +409,38 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       tempCanvas.height = scaledImg.naturalHeight;
       
       // DEBUG: 检查Canvas设置
-      console.log("=== Content Script Canvas设置 ===");
-      console.log("  Canvas尺寸:", tempCanvas.width, "x", tempCanvas.height);
-      console.log("  imageSmoothingEnabled:", tempCtx.imageSmoothingEnabled);
-      console.log("  globalAlpha:", tempCtx.globalAlpha);
-      console.log("  globalCompositeOperation:", tempCtx.globalCompositeOperation);
+      if (__DEV__) {
+        console.log("=== Content Script Canvas设置 ===");
+        console.log("  Canvas尺寸:", tempCanvas.width, "x", tempCanvas.height);
+        console.log("  imageSmoothingEnabled:", tempCtx.imageSmoothingEnabled);
+        console.log("  globalAlpha:", tempCtx.globalAlpha);
+        console.log("  globalCompositeOperation:", tempCtx.globalCompositeOperation);
+      }
       
       tempCtx.drawImage(scaledImg, 0, 0);
       
       // DEBUG: 验证绘制后的Canvas内容
-      console.log("=== 绘制后Canvas验证 ===");
-      const verifyImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-      const verifyData = verifyImageData.data;
-      console.log(`  验证数据长度: ${verifyData.length}`);
-      
-      // 统计前100个像素的颜色
-      const sampleColors = new Set<string>();
-      for (let i = 0; i < Math.min(400, verifyData.length); i += 4) {
-        const r = verifyData[i];
-        const g = verifyData[i + 1];
-        const b = verifyData[i + 2];
-        const a = verifyData[i + 3];
-        if (a !== 0) {
-          const color = `rgb(${r},${g},${b})`;
-          sampleColors.add(color);
+      if (__DEV__) {
+        console.log("=== 绘制后Canvas验证 ===");
+        const verifyImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const verifyData = verifyImageData.data;
+        console.log(`  验证数据长度: ${verifyData.length}`);
+        
+        // 统计前100个像素的颜色
+        const sampleColors = new Set<string>();
+        for (let i = 0; i < Math.min(400, verifyData.length); i += 4) {
+          const r = verifyData[i];
+          const g = verifyData[i + 1];
+          const b = verifyData[i + 2];
+          const a = verifyData[i + 3];
+          if (a !== 0) {
+            const color = `rgb(${r},${g},${b})`;
+            sampleColors.add(color);
+          }
         }
+        console.log(`  前100个像素中的颜色种类: ${sampleColors.size}`);
+        console.log(`  前5个样本颜色:`, Array.from(sampleColors).slice(0, 5));
       }
-      console.log(`  前100个像素中的颜色种类: ${sampleColors.size}`);
-      console.log(`  前5个样本颜色:`, Array.from(sampleColors).slice(0, 5));
 
       // Get image data
       const scaledImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
@@ -433,12 +481,16 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
 
       // Count colors
       const calculatedColorCounts: { [key: string]: number } = {};
-      console.log("=== Content Script颜色计算开始 ===");
-      console.log(`  图像尺寸: ${scaledImg.naturalWidth}x${scaledImg.naturalHeight}`);
+      if (__DEV__) {
+        console.log("=== Content Script颜色计算开始 ===");
+        console.log(`  图像尺寸: ${scaledImg.naturalWidth}x${scaledImg.naturalHeight}`);
+      }
       
       // 获取当前调色盘
       const currentPalette = (window as any).currentPalette || [];
-      console.log("  当前调色盘:", currentPalette);
+      if (__DEV__) {
+        console.log("  当前调色盘:", currentPalette);
+      }
       // currentPalette is already an array of RGB arrays, convert to RGB strings
       const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
       
@@ -462,18 +514,22 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
           if (!paletteColorsSet.has(color)) {
             outOfPaletteColors++;
             if (outOfPaletteColors <= 10) {  // 只记录前10个
-              console.warn(`  发现调色盘外颜色 at (${x},${y}): ${color}`);
+              if (__DEV__) {
+                console.warn(`  发现调色盘外颜色 at (${x},${y}): ${color}`);
+              }
             }
           }
         }
       }
       
-      console.log(`  检测到调色盘外颜色总数: ${outOfPaletteColors}`);
-      if (outOfPaletteColors > 0) {
-        console.log("  前几个调色盘外颜色:", Object.keys(calculatedColorCounts).filter(color => !paletteColorsSet.has(color)).slice(0, 5));
+      if (__DEV__) {
+        console.log(`  检测到调色盘外颜色总数: ${outOfPaletteColors}`);
+        if (outOfPaletteColors > 0) {
+          console.log("  前几个调色盘外颜色:", Object.keys(calculatedColorCounts).filter(color => !paletteColorsSet.has(color)).slice(0, 5));
+        }
+        
+        console.log("  颜色调色板颜色数量:", Object.keys(calculatedColorCounts).length);
       }
-      
-      console.log("  颜色调色板颜色数量:", Object.keys(calculatedColorCounts).length);
 
       // Now create the color panel with calculated color counts
       createColorPanelWithCalculatedColors(calculatedColorCounts, pixelScale);
@@ -1281,7 +1337,9 @@ const placeOverlay = (dataUrl: string) => {
     }
   }
 
-  console.log('Overlay placed at center of screen with separate control panel');
+  if (__DEV__) {
+    console.log('Overlay placed at center of screen with separate control panel');
+  }
 };
 
 // Set up click listener for overlay placement
@@ -1334,7 +1392,9 @@ const setupMessageListener = () => {
 };
 
 // Ensure the content script is ready to receive messages
-console.log('WPlace Professor Content Script loaded');
+if (__DEV__) {
+  console.log('WPlace Professor Content Script loaded');
+}
 
 // Set up the message listener
 setupMessageListener();

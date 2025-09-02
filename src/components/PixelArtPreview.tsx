@@ -60,7 +60,7 @@ const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({
         <h2 className="text-lg font-semibold mb-2">Pixel Art Preview</h2>
         <div
           className={cn(
-            "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors w-full",
+            "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors w-full aspect-square flex items-center justify-center",
             isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
           )}
           onDragOver={handleDragOver}
@@ -107,8 +107,8 @@ const PixelArtPreview: React.FC<PixelArtPreviewProps> = ({
           className="w-full"
         />
         <div className="flex justify-between text-xs text-gray-500 mt-0.5">
-          <span>Fine</span>
           <span>Coarse</span>
+          <span>Fine</span>
         </div>
       </div>
       

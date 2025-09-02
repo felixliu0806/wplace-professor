@@ -724,6 +724,13 @@ Actual: rgb(${verifyData[i]},${verifyData[i+1]},${verifyData[i+2]},${verifyData[
               setSelectedFile(null);
               setImageSrc(null);
               setPixelArtDataUrl(null);
+              // Trigger file input click
+              setTimeout(() => {
+                const fileInput = document.getElementById("fileInput") as HTMLInputElement | null;
+                if (fileInput) {
+                  fileInput.click();
+                }
+              }, 0);
             }}
             onPlaceOverlay={handlePlaceOverlay} // Add this new prop
           />
