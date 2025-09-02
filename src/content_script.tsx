@@ -627,13 +627,80 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.minWidth = '180px';
   controlPanelElement.style.fontSize = '14px'; // Base font size
 
-  // Create control panel title
+  // State for panel minimized/maximized
+  let isPanelMinimized = false;
+
+  // Create control panel title with minimize/maximize button
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+
   const title = document.createElement('h3');
   title.textContent = 'Controls';
-  title.style.margin = '0 0 8px 0';
+  title.style.margin = '0';
   title.style.fontSize = '18px';
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
+
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '−'; // Minimize symbol
+  toggleButton.style.background = 'none';
+  toggleButton.style.border = '1px solid #ccc';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.padding = '2px 6px';
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.fontSize = '14px';
+  toggleButton.style.fontWeight = 'bold';
+  toggleButton.title = 'Minimize/Maximize panel';
+
+  toggleButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isPanelMinimized = !isPanelMinimized;
+    
+    if (isPanelMinimized) {
+      // Minimize panel
+      controlPanelElement!.style.minWidth = '40px';
+      controlPanelElement!.style.padding = '8px';
+      titleContainer.style.marginBottom = '0';
+      toggleButton.textContent = '+'; // Maximize symbol
+      
+      // Hide all children except titleContainer
+      Array.from(controlPanelElement!.children).forEach(child => {
+        if (child !== titleContainer) {
+          (child as HTMLElement).style.display = 'none';
+        }
+      });
+    } else {
+      // Maximize panel
+      controlPanelElement!.style.minWidth = '180px';
+      controlPanelElement!.style.padding = '12px';
+      titleContainer.style.marginBottom = '8px';
+      toggleButton.textContent = '−'; // Minimize symbol
+      
+      // Show all children and restore their original display properties
+      zoomLabel.style.display = '';
+      zoomSlider.style.display = '';
+      zoomButtonsContainer.style.display = 'flex';
+      directionButtonsContainer.style.display = 'grid';
+      modeToggleBtn.style.display = '';
+      closeBtn.style.display = '';
+      
+      // Restore color panel if it exists
+      if (colorPanelElement) {
+        colorPanelElement.style.display = '';
+        // Also restore the color panel wrapper if it exists
+        const colorPanelWrapper = document.getElementById('wplace-professor-color-panel-wrapper');
+        if (colorPanelWrapper) {
+          colorPanelWrapper.style.display = '';
+        }
+      }
+    }
+  });
+
+  titleContainer.appendChild(title);
+  titleContainer.appendChild(toggleButton);
 
   // Create zoom slider
   const zoomLabel = document.createElement('div');
@@ -798,7 +865,7 @@ const placeOverlay = (dataUrl: string) => {
     closeBtn.style.background = '#ff4444';
   });
 
-  controlPanelElement.appendChild(title);
+  controlPanelElement.appendChild(titleContainer);
   controlPanelElement.appendChild(zoomLabel);
   controlPanelElement.appendChild(zoomSlider);
   controlPanelElement.appendChild(zoomButtonsContainer);
