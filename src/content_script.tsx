@@ -134,24 +134,40 @@ const drawPixelBlock = (
   y: number,
   blockSize: number,
   color: string,
-  drawCenter: boolean = true // Add parameter to control center color drawing
+  drawCenter: boolean = true, // Add parameter to control center color drawing
+  opacity: number = 1.0 // Add parameter to control opacity
 ) => {
-  // Draw the outer border (thin line)
+  // Draw the outer border (thin line) - always visible
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, blockSize, blockSize);
 
-  // For very small blocks, just fill with the color if drawing center
-  if (blockSize <= 3) {
-    if (drawCenter) {
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, blockSize, blockSize);
-    }
+  // If we're not drawing the center, we're done (only show the border)
+  if (!drawCenter) {
     return;
   }
 
-  // Calculate padding (10% of blockSize for padding on each side)
-  const padding = Math.max(1, Math.floor(blockSize * 0.1));
+  // For very small blocks, just fill with the color if drawing center
+  if (blockSize <= 3) {
+    // Apply alpha for transparency
+    const originalFillStyle = ctx.fillStyle;
+    const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      const r = rgbMatch[1];
+      const g = rgbMatch[2];
+      const b = rgbMatch[3];
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    } else {
+      ctx.fillStyle = color;
+    }
+    ctx.fillRect(x, y, blockSize, blockSize);
+    // Restore original fill style
+    ctx.fillStyle = originalFillStyle;
+    return;
+  }
+
+  // Calculate padding (25% of blockSize for padding on each side to make border more visible)
+  const padding = Math.max(1, Math.floor(blockSize * 0.25));
 
   // Draw the inner area (padding area) in white or light gray
   const innerX = x + padding;
@@ -162,17 +178,27 @@ const drawPixelBlock = (
     ctx.fillStyle = '#f0f0f0'; // Light gray for padding area
     ctx.fillRect(innerX, innerY, innerSize, innerSize);
 
-    // Draw the center color area (80% of blockSize) only if drawCenter is true
-    if (drawCenter) {
-      const centerPadding = Math.max(1, Math.floor(blockSize * 0.15)); // 15% padding for center area
-      const centerX = x + centerPadding;
-      const centerY = y + centerPadding;
-      const centerSize = blockSize - centerPadding * 2;
+    // Draw the center color area (50% of blockSize) only if drawCenter is true
+    const centerPadding = Math.max(1, Math.floor(blockSize * 0.3)); // 30% padding for center area
+    const centerX = x + centerPadding;
+    const centerY = y + centerPadding;
+    const centerSize = blockSize - centerPadding * 2;
 
-      if (centerSize > 0) {
+    if (centerSize > 0) {
+      // Apply alpha for transparency
+      const originalFillStyle = ctx.fillStyle;
+      const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (rgbMatch) {
+        const r = rgbMatch[1];
+        const g = rgbMatch[2];
+        const b = rgbMatch[3];
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      } else {
         ctx.fillStyle = color;
-        ctx.fillRect(centerX, centerY, centerSize, centerSize);
       }
+      ctx.fillRect(centerX, centerY, centerSize, centerSize);
+      // Restore original fill style
+      ctx.fillStyle = originalFillStyle;
     }
   }
 };
@@ -269,28 +295,29 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     blockCanvas.height = Math.round(originalImageHeight * scale);
 
     // Draw each pixel as a block, optionally filtered by color
-    for (let y = 0; y < scaledImg.naturalHeight; y++) {
-      for (let x = 0; x < scaledImg.naturalWidth; x++) {
-        const i = y * 4 * scaledImg.naturalWidth + x * 4;
-        const r = scaledData[i];
-        const g = scaledData[i + 1];
-        const b = scaledData[i + 2];
-        const a = scaledData[i + 3];
+        for (let y = 0; y < scaledImg.naturalHeight; y++) {
+          for (let x = 0; x < scaledImg.naturalWidth; x++) {
+            const i = y * 4 * scaledImg.naturalWidth + x * 4;
+            const r = scaledData[i];
+            const g = scaledData[i + 1];
+            const b = scaledData[i + 2];
+            const a = scaledData[i + 3];
 
-        // Skip transparent pixels
-        if (a === 0) continue;
+            // Skip transparent pixels
+            if (a === 0) continue;
 
-        const color = `rgb(${r},${g},${b})`;
+            const color = `rgb(${r},${g},${b})`;
 
-        // Draw pixel block with border, padding, and center color
-        const blockX = x * blockSize;
-        const blockY = y * blockSize;
+            // Draw pixel block with border, padding, and center color
+            const blockX = x * blockSize;
+            const blockY = y * blockSize;
 
-        // If a color filter is applied, only draw the center for matching colors
-        const drawCenter = !colorFilter || color === colorFilter;
-        drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, drawCenter);
-      }
-    }
+            // If a color filter is applied, only draw the center for matching colors
+            // For non-matching colors, we make them completely transparent (don't draw center)
+            const drawCenter = !colorFilter || color === colorFilter;
+            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, drawCenter, 1.0);
+          }
+        }
 
     // Removed: Draw border around the entire image
     // blockCtx.strokeStyle = '#000000';
@@ -680,6 +707,8 @@ const placeOverlay = (dataUrl: string) => {
       toggleButton.textContent = '−'; // Minimize symbol
       
       // Show all children and restore their original display properties
+      opacityLabel.style.display = '';
+      opacitySlider.style.display = '';
       zoomLabel.style.display = '';
       zoomSlider.style.display = '';
       zoomButtonsContainer.style.display = 'flex';
@@ -701,6 +730,38 @@ const placeOverlay = (dataUrl: string) => {
 
   titleContainer.appendChild(title);
   titleContainer.appendChild(toggleButton);
+
+  // Create opacity slider
+  const opacityLabel = document.createElement('div');
+  opacityLabel.id = 'opacity-label';
+  opacityLabel.textContent = 'Opacity: 90%';
+  opacityLabel.style.fontSize = '13px';
+  opacityLabel.style.marginBottom = '4px';
+  opacityLabel.style.color = '#555';
+  opacityLabel.style.fontWeight = 'bold';
+
+  const opacitySlider = document.createElement('input');
+  opacitySlider.type = 'range';
+  opacitySlider.id = 'opacity-slider';
+  opacitySlider.min = '0.1';
+  opacitySlider.max = '1.0';
+  opacitySlider.step = '0.01';
+  opacitySlider.value = '0.9'; // Default opacity
+  opacitySlider.style.width = '100%';
+  opacitySlider.style.marginBottom = '8px';
+  opacitySlider.style.cursor = 'pointer';
+
+  // Add event listener to the opacity slider
+  opacitySlider.addEventListener('input', (e) => {
+    const opacity = parseFloat((e.target as HTMLInputElement).value);
+    (document.getElementById('opacity-label') as HTMLElement).textContent = `Opacity: ${Math.round(opacity * 100)}%`;
+    
+    // Update the overlay canvas opacity
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      canvas.style.opacity = opacity.toString();
+    }
+  });
 
   // Create zoom slider
   const zoomLabel = document.createElement('div');
@@ -866,6 +927,8 @@ const placeOverlay = (dataUrl: string) => {
   });
 
   controlPanelElement.appendChild(titleContainer);
+  controlPanelElement.appendChild(opacityLabel);
+  controlPanelElement.appendChild(opacitySlider);
   controlPanelElement.appendChild(zoomLabel);
   controlPanelElement.appendChild(zoomSlider);
   controlPanelElement.appendChild(zoomButtonsContainer);
@@ -970,7 +1033,7 @@ const placeOverlay = (dataUrl: string) => {
             const blockY = y * blockSize;
 
             // Always draw the full pixel block structure in this section (no color filter)
-            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, true);
+            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, true, 1.0);
           }
         }
 
