@@ -1,1 +1,37 @@
-<div id="wplace-professor-color-panel-wrapper" style="margin-top: 12px; border: 1px solid rgb(221, 221, 221); border-radius: 4px; background-color: rgba(245, 245, 245, 0.9);"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; cursor: pointer;"><h4 style="margin: 0px; font-size: 15px; font-weight: bold; color: rgb(51, 51, 51);">Colors</h4><div style="display: flex; gap: 4px;"><button title="Clear color selection" style="background: none rgb(224, 224, 224); border: none; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 3px;">✕</button><button style="background: none rgb(224, 224, 224); border: none; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 3px;">▲</button></div></div></div>
+1. panel交互
+面板是作为独立的content script元素添加到页面
+可以展开和缩小面板，正常悬浮在屏幕左边，但是可以自由拖动，展开和缩小。
+Panel的默认宽度和展开/收缩后的宽度事宜为主，尽量简洁。展开/收缩的切换按钮位置自行设计，方便使用即可。
+面板的默认状态是展开
+2. 主要功能
+ 需要告知用户，只有页面出现share标识的时候才能使用功能
+ 2.1 当前位置保存
+    模拟点击<button class="btn btn-primary btn-soft"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="size-4.5"><path d="M680-80q-50 0-85-35t-35-85q0-6 3-28L282-392q-16 15-37 23.5t-45 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q24 0 45 8.5t37 23.5l281-164q-2-7-2.5-13.5T560-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-24 0-45-8.5T598-672L317-508q2 7 2.5 13.5t.5 14.5q0 8-.5 14.5T317-452l281 164q16-15 37-23.5t45-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"></path></svg><!----> Share</button>
+    此button，读取此<div class="border-base-content/20 rounded-field mt-3 flex w-full items-center gap-1 border-2 py-1.5 pl-4 pr-2.5"><input class="text-base-content/80 min-w-10 grow text-sm font-medium" readonly=""> <div class="h-10"><button class="btn btn-primary">Copy</button></div></div>
+    div中的input中的内容（即地址url），按照当前时间 + url保存到 本地localStorage中。
+    注意：交互上，通过css隐藏class="modal-box max-h-11/12" 点击share后的弹窗，但是当用户自己点击share按钮的时候，不能影响其正常弹出。只是我们模拟点击的时候，隐藏其显示
+    除了时间戳和URL，还要允许用户自定义一个名称，比如弹个窗让他自定义一下名称。如果没有输入，则使用当前时间年月日时分秒作为名称。名称最多10字符
+    localStorage中保存的数据结构我认为json即可，便于后续读取和使用
+ 2.2 打开已保存的位置列表
+    按照列表的方式展示所有已保存数据的名称 / 时间。每行提供一个删除按钮，点击即从localStorage删除。删除操作需要确认
+ 2.3 打开之前保存的位置
+    在localStorage中读取所有之前保存的位置的名称 + 时间 + url，列出在panal里，按照从晚到早的顺序排列。每一列有一个跳转按钮，点击即访问该url
+ 2.4 保存当前页面内容并下载
+    panel中有一个按钮用于下载当前页面，点击后，如当前位置保存那里，先模拟点击share按钮，再模拟点击download按钮<a class="btn btn-primary" href="blob:https://wplace.live/b6bdde48-c2c6-481d-b8ab-f3ac5012c188" download="wplace_2025-09-03_13-02-28.png"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="size-5"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"></path></svg><!----> Download</a>
+    注意仍然隐藏share后的弹窗，但是当用户自己点击share按钮的时候，不能影响其正常弹出。只是我们模拟点击的时候，隐藏其显示
+ 2.5 分享当前位置到 Reddit、Twitter、Facebook、Tumblr、WhatsApp Web、Telegram、Pinterest、LinkedIn
+    仍然模拟点击share按钮，读取input中的url。并模拟点击copy按钮<button class="btn"><!----><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="size-5"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"></path></svg><!----> Copy</button>
+    将图片copy到用户剪贴板中。并告知用户图片已保存在剪贴板中，并按照不同的平台，通过不同的url打开新的窗口跳转到不同地址，地址如下。将我们读取到的url替换下面分享url的{URL}参数
+    # Twitter (X)https://twitter.com/intent/tweet?url={URL}
+    # Facebook https://www.facebook.com/sharer/sharer.php?u={URL}
+    # Reddit https://www.reddit.com/submit?url={URL}
+    # LinkedIn https://www.linkedin.com/sharing/share-offsite/?url={URL}
+    # Pinterest https://pinterest.com/pin/create/button/?url={URL}
+    # Tumblr https://www.tumblr.com/widgets/share/tool?canonicalUrl={URL}
+    # WhatsApp Web https://wa.me/?{URL}
+    # Messenger https://www.facebook.com/dialog/send?link={URL}
+    # Telegram https://t.me/share/url?url={URL}
+    注意仍然隐藏share后的弹窗，但是当用户自己点击share按钮的时候，不能影响其正常弹出。只是我们模拟点击的时候，隐藏其显示
+3. 设计风格继续延续本项目的传统风格，注意使用shadcnUI
+4. 错误处理：
+   若找不到元素，则告知需要点击页面展示share按钮

@@ -44,3 +44,10 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* CSS to hide modal when data-silent attribute is present */
+dialog.modal[data-silent][open] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

@@ -6,8 +6,23 @@ let pixelArtDataUrl: string | null = null;
 let colorCounts: { [color: string]: number } = {};
 let scaledRef: string | null = null; // 新增的scaledRef属性
 
+// State for the save locations panel
+let saveLocationsPanelElement: HTMLDivElement | null = null;
+
 // Keep track of whether the listener is already set up
 let isListenerSetUp = false;
+
+// Constants for localStorage
+const SAVE_LOCATIONS_KEY = 'wplace_professor_save_locations';
+const MAX_NAME_LENGTH = 10;
+
+// Type definition for saved locations
+interface SavedLocation {
+  id: string;
+  name: string;
+  timestamp: number;
+  url: string;
+}
 
 // Function to detect available colors on wplace.live
 const detectAvailableColors = (): string[] => {
@@ -151,10 +166,10 @@ const colorSim = (rgbColor: number[], compareColor: number[]): number => {
 // Function to find the most similar color in the palette
 const similarColor = (actualColor: number[], selectedPalette: number[][]): number[] => {
   if (selectedPalette.length === 0) return actualColor;
-  
+
   let selectedColor = selectedPalette[0];
   let currentSim = colorSim(actualColor, selectedPalette[0]);
-  
+
   for (const color of selectedPalette) {
     const nextColor = colorSim(actualColor, color);
     if (nextColor <= currentSim) {
@@ -277,50 +292,50 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     const scaledData = scaledImageData.data;
 
     // If we have unscaled image data, apply color palette conversion
-  if (unscaledImageDataUrl) {
-    // Function to convert "rgb(r, g, b)" string to [r, g, b] array
-    const rgbStringToArray = (rgbString: string): number[] => {
-      const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-      if (match) {
-        return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
-      }
-      // Fallback: return black if parsing fails
-      if (__DEV__) {
-        console.warn("Failed to parse RGB string:", rgbString);
-      }
-      return [0, 0, 0];
-    };
+    if (unscaledImageDataUrl) {
+      // Function to convert "rgb(r, g, b)" string to [r, g, b] array
+      const rgbStringToArray = (rgbString: string): number[] => {
+        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+          return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+        }
+        // Fallback: return black if parsing fails
+        if (__DEV__) {
+          console.warn("Failed to parse RGB string:", rgbString);
+        }
+        return [0, 0, 0];
+      };
 
-    // Get selected palette for color conversion
-    // palette is already an array of RGB arrays, use it directly
-    const selectedPalette = palette;
-    
-    // Apply palette conversion to each pixel in the scaled image
-    for (let y = 0; y < scaledImageData.height; y++) {
-      for (let x = 0; x < scaledImageData.width; x++) {
-        const i = y * 4 * scaledImageData.width + x * 4;
-        const r = scaledData[i];
-        const g = scaledData[i + 1];
-        const b = scaledData[i + 2];
-        const a = scaledData[i + 3];
-        
-        // Skip transparent pixels
-        if (a === 0) continue;
-        
-        // Find the most similar color in the palette
-        const originalColor = [r, g, b];
-        const finalColor = similarColor(originalColor, selectedPalette);
-        
-        // Apply the final color
-        scaledData[i] = finalColor[0];
-        scaledData[i + 1] = finalColor[1];
-        scaledData[i + 2] = finalColor[2];
+      // Get selected palette for color conversion
+      // palette is already an array of RGB arrays, use it directly
+      const selectedPalette = palette;
+
+      // Apply palette conversion to each pixel in the scaled image
+      for (let y = 0; y < scaledImageData.height; y++) {
+        for (let x = 0; x < scaledImageData.width; x++) {
+          const i = y * 4 * scaledImageData.width + x * 4;
+          const r = scaledData[i];
+          const g = scaledData[i + 1];
+          const b = scaledData[i + 2];
+          const a = scaledData[i + 3];
+
+          // Skip transparent pixels
+          if (a === 0) continue;
+
+          // Find the most similar color in the palette
+          const originalColor = [r, g, b];
+          const finalColor = similarColor(originalColor, selectedPalette);
+
+          // Apply the final color
+          scaledData[i] = finalColor[0];
+          scaledData[i + 1] = finalColor[1];
+          scaledData[i + 2] = finalColor[2];
+        }
       }
+
+      // Put the modified image data back to the temp canvas
+      tempCtx.putImageData(scaledImageData, 0, 0);
     }
-    
-    // Put the modified image data back to the temp canvas
-    tempCtx.putImageData(scaledImageData, 0, 0);
-  }
 
     // Now draw each pixel as a block with border, padding, and center color
     // Create another temporary canvas for the block drawing
@@ -337,29 +352,29 @@ const redrawCanvasWithColorBlocks = (canvas: HTMLCanvasElement, ctx: CanvasRende
     blockCanvas.height = Math.round(originalImageHeight * scale);
 
     // Draw each pixel as a block, optionally filtered by color
-        for (let y = 0; y < scaledImg.naturalHeight; y++) {
-          for (let x = 0; x < scaledImg.naturalWidth; x++) {
-            const i = y * 4 * scaledImg.naturalWidth + x * 4;
-            const r = scaledData[i];
-            const g = scaledData[i + 1];
-            const b = scaledData[i + 2];
-            const a = scaledData[i + 3];
+    for (let y = 0; y < scaledImg.naturalHeight; y++) {
+      for (let x = 0; x < scaledImg.naturalWidth; x++) {
+        const i = y * 4 * scaledImg.naturalWidth + x * 4;
+        const r = scaledData[i];
+        const g = scaledData[i + 1];
+        const b = scaledData[i + 2];
+        const a = scaledData[i + 3];
 
-            // Skip transparent pixels
-            if (a === 0) continue;
+        // Skip transparent pixels
+        if (a === 0) continue;
 
-            const color = `rgb(${r},${g},${b})`;
+        const color = `rgb(${r},${g},${b})`;
 
-            // Draw pixel block with border, padding, and center color
-            const blockX = x * blockSize;
-            const blockY = y * blockSize;
+        // Draw pixel block with border, padding, and center color
+        const blockX = x * blockSize;
+        const blockY = y * blockSize;
 
-            // If a color filter is applied, only draw the center for matching colors
-            // For non-matching colors, we make them completely transparent (don't draw center)
-            const drawCenter = !colorFilter || color === colorFilter;
-            drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, drawCenter, 1.0);
-          }
-        }
+        // If a color filter is applied, only draw the center for matching colors
+        // For non-matching colors, we make them completely transparent (don't draw center)
+        const drawCenter = !colorFilter || color === colorFilter;
+        drawPixelBlock(blockCtx, blockX, blockY, blockSize, color, drawCenter, 1.0);
+      }
+    }
 
     // Removed: Draw border around the entire image
     // blockCtx.strokeStyle = '#000000';
@@ -407,7 +422,7 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       // Draw the scaled image
       tempCanvas.width = scaledImg.naturalWidth;
       tempCanvas.height = scaledImg.naturalHeight;
-      
+
       // DEBUG: 检查Canvas设置
       if (__DEV__) {
         console.log("=== Content Script Canvas设置 ===");
@@ -416,16 +431,16 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
         console.log("  globalAlpha:", tempCtx.globalAlpha);
         console.log("  globalCompositeOperation:", tempCtx.globalCompositeOperation);
       }
-      
+
       tempCtx.drawImage(scaledImg, 0, 0);
-      
+
       // DEBUG: 验证绘制后的Canvas内容
       if (__DEV__) {
         console.log("=== 绘制后Canvas验证 ===");
         const verifyImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
         const verifyData = verifyImageData.data;
         console.log(`  验证数据长度: ${verifyData.length}`);
-        
+
         // 统计前100个像素的颜色
         const sampleColors = new Set<string>();
         for (let i = 0; i < Math.min(400, verifyData.length); i += 4) {
@@ -451,7 +466,7 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       if (unscaledImageDataUrl) {
         // Get selected palette for color conversion
         const currentPalette = (window as any).currentPalette || [];
-        
+
         // Apply palette conversion to each pixel in the scaled image
         for (let y = 0; y < scaledImageData.height; y++) {
           for (let x = 0; x < scaledImageData.width; x++) {
@@ -460,21 +475,21 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
             const g = scaledData[i + 1];
             const b = scaledData[i + 2];
             const a = scaledData[i + 3];
-            
+
             // Skip transparent pixels
             if (a === 0) continue;
-            
+
             // Find the most similar color in the palette
             const originalColor = [r, g, b];
             const finalColor = similarColor(originalColor, currentPalette);
-            
+
             // Apply the final color
             scaledData[i] = finalColor[0];
             scaledData[i + 1] = finalColor[1];
             scaledData[i + 2] = finalColor[2];
           }
         }
-        
+
         // Put the modified image data back to the temp canvas
         tempCtx.putImageData(scaledImageData, 0, 0);
       }
@@ -485,7 +500,7 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
         console.log("=== Content Script颜色计算开始 ===");
         console.log(`  图像尺寸: ${scaledImg.naturalWidth}x${scaledImg.naturalHeight}`);
       }
-      
+
       // 获取当前调色盘
       const currentPalette = (window as any).currentPalette || [];
       if (__DEV__) {
@@ -493,9 +508,9 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
       }
       // currentPalette is already an array of RGB arrays, convert to RGB strings
       const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
-      
+
       let outOfPaletteColors = 0;
-      
+
       for (let y = 0; y < scaledImg.naturalHeight; y++) {
         for (let x = 0; x < scaledImg.naturalWidth; x++) {
           const i = y * 4 * scaledImg.naturalWidth + x * 4;
@@ -509,7 +524,7 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
 
           const color = `rgb(${r},${g},${b})`;
           calculatedColorCounts[color] = (calculatedColorCounts[color] || 0) + 1;
-          
+
           // 检查是否为调色盘外颜色
           if (!paletteColorsSet.has(color)) {
             outOfPaletteColors++;
@@ -521,13 +536,13 @@ const createColorPanel = (colorCounts: { [key: string]: number } | null, pixelSc
           }
         }
       }
-      
+
       if (__DEV__) {
         console.log(`  检测到调色盘外颜色总数: ${outOfPaletteColors}`);
         if (outOfPaletteColors > 0) {
           console.log("  前几个调色盘外颜色:", Object.keys(calculatedColorCounts).filter(color => !paletteColorsSet.has(color)).slice(0, 5));
         }
-        
+
         console.log("  颜色调色板颜色数量:", Object.keys(calculatedColorCounts).length);
       }
 
@@ -741,14 +756,14 @@ const placeOverlay = (dataUrl: string) => {
   toggleButton.addEventListener('click', (e) => {
     e.stopPropagation();
     isPanelMinimized = !isPanelMinimized;
-    
+
     if (isPanelMinimized) {
       // Minimize panel
       controlPanelElement!.style.minWidth = '40px';
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
       toggleButton.textContent = '+'; // Maximize symbol
-      
+
       // Hide all children except titleContainer
       Array.from(controlPanelElement!.children).forEach(child => {
         if (child !== titleContainer) {
@@ -761,7 +776,7 @@ const placeOverlay = (dataUrl: string) => {
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       toggleButton.textContent = '−'; // Minimize symbol
-      
+
       // Show all children and restore their original display properties
       opacityLabel.style.display = '';
       opacitySlider.style.display = '';
@@ -771,7 +786,7 @@ const placeOverlay = (dataUrl: string) => {
       directionButtonsContainer.style.display = 'grid';
       modeToggleBtn.style.display = '';
       closeBtn.style.display = '';
-      
+
       // Restore color panel if it exists
       if (colorPanelElement) {
         colorPanelElement.style.display = '';
@@ -811,7 +826,7 @@ const placeOverlay = (dataUrl: string) => {
   opacitySlider.addEventListener('input', (e) => {
     const opacity = parseFloat((e.target as HTMLInputElement).value);
     (document.getElementById('opacity-label') as HTMLElement).textContent = `Opacity: ${Math.round(opacity * 100)}%`;
-    
+
     // Update the overlay canvas opacity
     const canvas = overlayElement?.querySelector('canvas');
     if (canvas) {
@@ -1035,21 +1050,21 @@ const placeOverlay = (dataUrl: string) => {
               const g = scaledData[i + 1];
               const b = scaledData[i + 2];
               const a = scaledData[i + 3];
-              
+
               // Skip transparent pixels
               if (a === 0) continue;
-              
+
               // Find the most similar color in the palette
               const originalColor = [r, g, b];
               const finalColor = similarColor(originalColor, palette);
-              
+
               // Apply the final color
               scaledData[i] = finalColor[0];
               scaledData[i + 1] = finalColor[1];
               scaledData[i + 2] = finalColor[2];
             }
           }
-          
+
           // Put the modified image data back to the temp canvas
           tempCtx.putImageData(scaledImageData, 0, 0);
         }
@@ -1340,6 +1355,9 @@ const placeOverlay = (dataUrl: string) => {
   if (__DEV__) {
     console.log('Overlay placed at center of screen with separate control panel');
   }
+
+  // Create the save locations panel
+  createSaveLocationsPanel();
 };
 
 // Set up click listener for overlay placement
@@ -1454,28 +1472,28 @@ const removeOverlay = () => {
 // Helper function to create color panel with calculated color counts
 const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: number }, pixelScale: number) => {
   console.log("=== Content Script颜色面板创建 ===");
-      console.log(`  接收到的颜色种类数量: ${Object.keys(colorCounts).length}`);
-      
-      // DEBUG: 比较SidePanel和Content Script的调色盘
-      const sidePanelPalette = (window as any).currentPalette || [];
-      console.log("  SidePanel调色盘:", sidePanelPalette);
-      
-      // 获取当前调色盘
-      const currentPalette = (window as any).currentPalette || [];
-      console.log("  当前调色盘:", currentPalette);
-      // currentPalette is already an array of RGB arrays, convert to RGB strings
-      const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
-      
-      // 检查颜色是否在调色盘范围内
-      const outOfPaletteColors = Object.keys(colorCounts).filter(color => !paletteColorsSet.has(color));
-      console.log(`  调色盘外颜色种类数量: ${outOfPaletteColors.length}`);
-      if (outOfPaletteColors.length > 0) {
-        console.warn("  发现调色盘外颜色:", outOfPaletteColors.slice(0, 10)); // 只显示前10个
-      }
-      
-      // 计算总像素数
-      const totalPixels = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
-      console.log(`  总像素数: ${totalPixels}`);
+  console.log(`  接收到的颜色种类数量: ${Object.keys(colorCounts).length}`);
+
+  // DEBUG: 比较SidePanel和Content Script的调色盘
+  const sidePanelPalette = (window as any).currentPalette || [];
+  console.log("  SidePanel调色盘:", sidePanelPalette);
+
+  // 获取当前调色盘
+  const currentPalette = (window as any).currentPalette || [];
+  console.log("  当前调色盘:", currentPalette);
+  // currentPalette is already an array of RGB arrays, convert to RGB strings
+  const paletteColorsSet = new Set(currentPalette.map((color: number[]) => `rgb(${color[0]},${color[1]},${color[2]})`));
+
+  // 检查颜色是否在调色盘范围内
+  const outOfPaletteColors = Object.keys(colorCounts).filter(color => !paletteColorsSet.has(color));
+  console.log(`  调色盘外颜色种类数量: ${outOfPaletteColors.length}`);
+  if (outOfPaletteColors.length > 0) {
+    console.warn("  发现调色盘外颜色:", outOfPaletteColors.slice(0, 10)); // 只显示前10个
+  }
+
+  // 计算总像素数
+  const totalPixels = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+  console.log(`  总像素数: ${totalPixels}`);
 
   // Create color panel wrapper (always visible)
   const colorPanelWrapper = document.createElement('div');
@@ -1698,4 +1716,527 @@ const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: numb
   if (controlPanelElement) {
     controlPanelElement.appendChild(colorPanelWrapper);
   }
+};
+
+// Function to create and manage the save locations panel
+const createSaveLocationsPanel = () => {
+  // Remove existing save locations panel if any
+  if (saveLocationsPanelElement) {
+    saveLocationsPanelElement.remove();
+  }
+
+  // Create save locations panel
+  saveLocationsPanelElement = document.createElement('div');
+  saveLocationsPanelElement.id = 'wplace-professor-save-locations-panel';
+  saveLocationsPanelElement.style.position = 'fixed';
+  saveLocationsPanelElement.style.left = '20px';
+  saveLocationsPanelElement.style.top = '50%';
+  saveLocationsPanelElement.style.transform = 'translateY(-50%)';
+  saveLocationsPanelElement.style.zIndex = '99997';
+  saveLocationsPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  saveLocationsPanelElement.style.padding = '12px';
+  saveLocationsPanelElement.style.borderRadius = '6px';
+  saveLocationsPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  saveLocationsPanelElement.style.fontFamily = 'Arial, sans-serif';
+  saveLocationsPanelElement.style.minWidth = '200px';
+  saveLocationsPanelElement.style.fontSize = '14px';
+  saveLocationsPanelElement.style.display = 'flex';
+  saveLocationsPanelElement.style.flexDirection = 'column';
+
+  // State for panel minimized/maximized
+  let isPanelMinimized = false;
+
+  // Create panel header with title and toggle button
+  const header = document.createElement('div');
+  header.style.display = 'flex';
+  header.style.justifyContent = 'space-between';
+  header.style.alignItems = 'center';
+  header.style.marginBottom = '8px';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Saved Locations';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '−'; // Minimize symbol
+  toggleButton.style.background = 'none';
+  toggleButton.style.border = '1px solid #ccc';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.padding = '2px 6px';
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.fontSize = '14px';
+  toggleButton.style.fontWeight = 'bold';
+  toggleButton.title = 'Minimize/Maximize panel';
+
+  toggleButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isPanelMinimized = !isPanelMinimized;
+
+    if (isPanelMinimized) {
+      // Minimize panel
+      saveLocationsPanelElement!.style.minWidth = '40px';
+      saveLocationsPanelElement!.style.padding = '8px';
+      header.style.marginBottom = '0';
+      toggleButton.textContent = '+'; // Maximize symbol
+
+      // Hide all children except header
+      Array.from(saveLocationsPanelElement!.children).forEach(child => {
+        if (child !== header) {
+          (child as HTMLElement).style.display = 'none';
+        }
+      });
+    } else {
+      // Maximize panel
+      saveLocationsPanelElement!.style.minWidth = '200px';
+      saveLocationsPanelElement!.style.padding = '12px';
+      header.style.marginBottom = '8px';
+      toggleButton.textContent = '−'; // Minimize symbol
+
+      // Show all children
+      Array.from(saveLocationsPanelElement!.children).forEach(child => {
+        (child as HTMLElement).style.display = '';
+      });
+
+      // Refresh the saved locations list
+      refreshSavedLocationsList();
+    }
+  });
+
+  header.appendChild(title);
+  header.appendChild(toggleButton);
+  saveLocationsPanelElement.appendChild(header);
+
+  // Create save current location button
+  const saveButton = document.createElement('button');
+  saveButton.textContent = 'Save Current Location';
+  saveButton.style.background = '#4CAF50';
+  saveButton.style.color = 'white';
+  saveButton.style.border = 'none';
+  saveButton.style.borderRadius = '3px';
+  saveLocationsPanelElement.appendChild(saveButton);
+
+  // Create download button
+  const downloadButton = document.createElement('button');
+  downloadButton.textContent = 'Download Current Page';
+  downloadButton.style.background = '#2196F3';
+  downloadButton.style.color = 'white';
+  downloadButton.style.border = 'none';
+  downloadButton.style.borderRadius = '3px';
+  downloadButton.style.marginTop = '8px';
+  saveLocationsPanelElement.appendChild(downloadButton);
+
+  // Create social media sharing buttons container
+  const socialButtonsContainer = document.createElement('div');
+  socialButtonsContainer.style.marginTop = '8px';
+  socialButtonsContainer.style.display = 'grid';
+  socialButtonsContainer.style.gridTemplateColumns = '1fr 1fr';
+  socialButtonsContainer.style.gap = '4px';
+
+  const socialPlatforms = [
+    { name: 'Twitter', color: '#1DA1F2' },
+    { name: 'Facebook', color: '#4267B2' },
+    { name: 'Reddit', color: '#FF4500' },
+    { name: 'LinkedIn', color: '#0077B5' },
+    { name: 'Pinterest', color: '#E60023' },
+    { name: 'Tumblr', color: '#35465C' },
+    { name: 'WhatsApp', color: '#25D366' },
+    { name: 'Telegram', color: '#0088cc' }
+  ];
+
+  socialPlatforms.forEach(platform => {
+    const button = document.createElement('button');
+    button.textContent = platform.name;
+    button.style.background = platform.color;
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '3px';
+    button.style.padding = '4px';
+    button.style.cursor = 'pointer';
+    button.style.fontSize = '12px';
+    button.addEventListener('click', () => {
+      shareToSocialMedia(platform.name);
+    });
+    socialButtonsContainer.appendChild(button);
+  });
+
+  saveLocationsPanelElement.appendChild(socialButtonsContainer);
+
+  // Create saved locations list container
+  const listContainer = document.createElement('div');
+  listContainer.id = 'saved-locations-list';
+  listContainer.style.marginTop = '8px';
+  listContainer.style.maxHeight = '200px';
+  listContainer.style.overflowY = 'auto';
+  saveLocationsPanelElement.appendChild(listContainer);
+
+  // Add event listeners
+  saveButton.addEventListener('click', saveCurrentLocation);
+  // downloadButton.addEventListener('click', downloadCurrentPage);
+
+  // Add panel to document
+  document.body.appendChild(saveLocationsPanelElement);
+
+  // Load saved locations
+  refreshSavedLocationsList();
+
+  // Make the panel draggable
+  makePanelDraggable(saveLocationsPanelElement);
+};
+
+// Function to make panel draggable
+const makePanelDraggable = (panel: HTMLDivElement) => {
+  let isDragging = false;
+  let currentX: number;
+  let currentY: number;
+  let initialX: number;
+  let initialY: number;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  panel.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+
+  function dragStart(e: MouseEvent) {
+    // Only drag when clicking on the header
+    if (e.target === panel.firstChild) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      isDragging = true;
+    }
+  }
+
+  function drag(e: MouseEvent) {
+    if (isDragging) {
+      e.preventDefault();
+
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, panel);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+
+    isDragging = false;
+  }
+
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+  }
+};
+// Function to delete a saved location
+const deleteSavedLocation = (id: string) => {
+  const savedLocations = getSavedLocations();
+  const filteredLocations = savedLocations.filter(location => location.id !== id);
+  localStorage.setItem(SAVE_LOCATIONS_KEY, JSON.stringify(filteredLocations));
+  refreshSavedLocationsList();
+};
+
+// Function to share to social media
+const shareToSocialMedia = async (platform: string) => {
+  // Check if share button exists by looking for a button with "Share" text
+  const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
+  let shareButton: Element | null = null;
+
+  // Find the button with "Share" text
+  for (let i = 0; i < shareButtons.length; i++) {
+    const button = shareButtons[i];
+    // Check if the button contains the text "Share"
+    if (button.textContent && button.textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+    // Check if the button has a text node with "Share"
+    const textNodes = Array.from(button.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+    if (textNodes.length > 0 && textNodes[0].textContent && textNodes[0].textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+  }
+
+  if (!shareButton) {
+    alert('Please click the page share button first to enable this feature.');
+    return;
+  }
+
+  // Simulate click on share button
+  (shareButton as HTMLElement).click();
+
+  // Wait a bit for the modal to appear and data to render
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Get the URL from the input
+  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
+  if (!urlInput) { alert('Could not find URL input. Please try again.'); return; }
+  const url = urlInput.value;  // Generate share URL based on platform
+  let shareUrl = '';
+  switch (platform) {
+    case 'Twitter':
+      shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Facebook':
+      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+      break;
+    case 'Reddit':
+      shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
+      break;
+    case 'LinkedIn':
+      shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Pinterest':
+      shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Tumblr':
+      shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
+      break;
+    case 'WhatsApp':
+      shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
+      break;
+    case 'Telegram':
+      shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
+      break;
+    default:
+      alert(`Unsupported platform: ${platform}`);
+      return;
+  }
+
+  // Open share URL in new window
+  window.open(shareUrl, '_blank');
+};
+
+const getSavedLocations = (): SavedLocation[] => {
+  try {
+    const savedLocationsStr = localStorage.getItem(SAVE_LOCATIONS_KEY);
+    return savedLocationsStr ? JSON.parse(savedLocationsStr) : [];
+  } catch (e) {
+    if (__DEV__) {
+      console.error('Error parsing saved locations:', e);
+    }
+    return [];
+  }
+};
+// Function to refresh the saved locations list
+const refreshSavedLocationsList = () => {
+  const listContainer = document.getElementById('saved-locations-list');
+  if (!listContainer) return;
+
+  // Clear the list
+  listContainer.innerHTML = '';
+
+  // Get saved locations
+  const savedLocations = getSavedLocations();
+
+  // If no saved locations, show a message
+  if (savedLocations.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.textContent = 'No saved locations';
+    emptyMessage.style.color = '#666';
+    emptyMessage.style.fontSize = '12px';
+    emptyMessage.style.textAlign = 'center';
+    emptyMessage.style.padding = '8px';
+    listContainer.appendChild(emptyMessage);
+    return;
+  }
+
+  // Add each saved location to the list
+  savedLocations.forEach(location => {
+    const item = document.createElement('div');
+    item.style.display = 'flex';
+    item.style.justifyContent = 'space-between';
+    item.style.alignItems = 'center';
+    item.style.padding = '4px';
+    item.style.borderBottom = '1px solid #eee';
+
+    const info = document.createElement('div');
+    info.style.flex = '1';
+    info.style.minWidth = '0'; // Allow text truncation
+
+    const name = document.createElement('div');
+    name.textContent = location.name;
+    name.style.fontSize = '13px';
+    name.style.fontWeight = 'bold';
+    name.style.overflow = 'hidden';
+    name.style.textOverflow = 'ellipsis';
+    name.style.whiteSpace = 'nowrap';
+
+    const time = document.createElement('div');
+    time.textContent = new Date(location.timestamp).toLocaleString();
+    time.style.fontSize = '11px';
+    time.style.color = '#666';
+
+    info.appendChild(name);
+    info.appendChild(time);
+
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.display = 'flex';
+    buttonsContainer.style.gap = '4px';
+
+    // Open button
+    const openButton = document.createElement('button');
+    openButton.textContent = 'Open';
+    openButton.style.background = '#4CAF50';
+    openButton.style.color = 'white';
+    openButton.style.border = 'none';
+    openButton.style.borderRadius = '3px';
+    openButton.style.padding = '2px 6px';
+    openButton.style.cursor = 'pointer';
+    openButton.style.fontSize = '11px';
+    openButton.addEventListener('click', () => {
+      window.open(location.url, '_blank');
+    });
+
+    // Delete button
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = '×';
+    deleteButton.style.background = '#f44336';
+    deleteButton.style.color = 'white';
+    deleteButton.style.border = 'none';
+    deleteButton.style.borderRadius = '3px';
+    deleteButton.style.padding = '2px 6px';
+    deleteButton.style.cursor = 'pointer';
+    deleteButton.style.fontSize = '11px';
+    deleteButton.addEventListener('click', () => {
+      if (confirm(`Are you sure you want to delete "${location.name}"?`)) {
+        deleteSavedLocation(location.id);
+      }
+    });
+
+    buttonsContainer.appendChild(openButton);
+    buttonsContainer.appendChild(deleteButton);
+
+    item.appendChild(info);
+    item.appendChild(buttonsContainer);
+
+    listContainer.appendChild(item);
+  });
+};
+// Function to save current location
+const saveCurrentLocation = async () => {
+  // Check if share button exists by looking for a button with "Share" text
+  const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
+  let shareButton: Element | null = null;
+
+  // Find the button with "Share" text
+  for (let i = 0; i < shareButtons.length; i++) {
+    const button = shareButtons[i];
+    // Check if the button contains the text "Share"
+    if (button.textContent && button.textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+    // Check if the button has a text node with "Share"
+    const textNodes = Array.from(button.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+    if (textNodes.length > 0 && textNodes[0].textContent && textNodes[0].textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+  }
+
+  if (!shareButton) { alert('Please click the page share button first to enable this feature.'); return; }  // Simulate click on share button
+  (shareButton as HTMLElement).click(); // Wait a bit for the modal to appear and data to render
+  await new Promise(resolve => setTimeout(resolve, 500)); // Get the URL from the input
+  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
+  if (!urlInput) {
+    alert('Could not find URL input. Please try again.'); return;
+  }
+  const url = urlInput.value;  // Find and click the copy button
+
+  // Prompt user for a name
+  let locationName = prompt(`Enter a name for this location (max ${MAX_NAME_LENGTH} characters):`,
+    new Date().toISOString().replace(/T.*/, '').replace(/-/g, ''));
+
+  // If user cancels, return
+  if (locationName === null) return;
+
+  // If no name provided, use timestamp
+  if (!locationName.trim()) {
+    locationName = new Date().toISOString().replace(/T.*/, '').replace(/-/g, '');
+  }
+
+  // Truncate name if too long
+  if (locationName.length > MAX_NAME_LENGTH) {
+    locationName = locationName.substring(0, MAX_NAME_LENGTH);
+  }
+
+  // Create saved location object
+  const savedLocation: SavedLocation = {
+    id: Date.now().toString(),
+    name: locationName,
+    timestamp: Date.now(),
+    url: url
+  };
+
+  // Save to localStorage
+  const savedLocations = getSavedLocations();
+  savedLocations.unshift(savedLocation); // Add to beginning of array
+  localStorage.setItem(SAVE_LOCATIONS_KEY, JSON.stringify(savedLocations));
+
+  // Refresh the list
+  refreshSavedLocationsList();
+
+  // Show success message
+  alert(`Location \"${locationName}\" saved successfully!`);
+};
+
+
+
+
+
+
+// Function to download current page
+const downloadCurrentPage = async () => {
+  // Check if share button exists by looking for a button with "Share" text
+  const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
+  let shareButton: Element | null = null;
+
+  // Find the button with "Share" text
+  for (let i = 0; i < shareButtons.length; i++) {
+    const button = shareButtons[i];
+    // Check if the button contains the text "Share"
+    if (button.textContent && button.textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+    // Check if the button has a text node with "Share"
+    const textNodes = Array.from(button.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+    if (textNodes.length > 0 && textNodes[0].textContent && textNodes[0].textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+  }
+
+  if (!shareButton) {
+    alert('Please click the page share button first to enable this feature.');
+    return;
+  }
+
+  // Simulate click on share button
+  (shareButton as HTMLElement).click();
+
+  // Wait a bit for the modal to appear and data to render
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Find and click the download button
+  const downloadButton = document.querySelector('a.btn.btn-primary[download]') as HTMLAnchorElement;
+  if (!downloadButton) {
+    alert('Could not find download button. Please try again.');
+    return;
+  }
+
+  // Simulate click on download button
+  downloadButton.click();
+
+  // Show success message
+  alert('Download started!');
 };

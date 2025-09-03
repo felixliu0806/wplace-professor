@@ -22,3 +22,45 @@
         
         直接通过css处理即可
 
+function openShareSilently() {
+  const dialog = document.querySelector('dialog.modal');
+  if (!dialog) return;
+
+  // 临时隐藏弹窗
+  dialog.style.opacity = '0';
+  dialog.style.pointerEvents = 'none';
+  dialog.style.visibility = 'hidden';
+
+  // 触发页面 Share 按钮
+  document.querySelector('.share-btn')?.click();
+
+  // 监听 blob 图片出现并加载完成
+  const observer = new MutationObserver(() => {
+    const img = dialog.querySelector('img[src^="blob:"]');
+    if (img) {
+      img.addEventListener('load', async () => {
+        console.log('Blob image loaded:', img.src);
+
+        // 获取 blob 数据
+        const blob = await fetch(img.src).then(r => r.blob());
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result; // data:image/png;base64,...
+          console.log('Base64 image:', base64data);
+          // 这里你可以发送给后台、保存、下载等
+        };
+        reader.readAsDataURL(blob);
+
+        // 还原样式并关闭弹窗
+        dialog.style.opacity = '';
+        dialog.style.pointerEvents = '';
+        dialog.style.visibility = '';
+        dialog.removeAttribute('open');
+
+        observer.disconnect();
+      }, { once: true });
+    }
+  });
+
+  observer.observe(dialog, { childList: true, subtree: true });
+}

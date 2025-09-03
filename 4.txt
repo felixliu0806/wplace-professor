@@ -1,4 +1,39 @@
-解锁结构
-<button class="btn relative aspect-square w-full rounded-xl border-base-content/20 max-sm:h-6 max-sm:rounded-md" aria-label="Dark Gray" id="color-2" style="background: rgb(60, 60, 60);"><!----></button>
-未解锁结构
-<button class="btn relative aspect-square w-full rounded-xl border-base-content/20 max-sm:h-6 max-sm:rounded-md" aria-label="Light Goldenrod" id="color-39" style="background: rgb(232, 212, 95);"><!----><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="center-absolute absolute size-4 opacity-30 sm:hidden sm:size-6"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"></path></svg><!----> <span class="bg-base-100 translate-1/2 absolute bottom-0 right-0 flex size-5 items-center justify-center rounded-full max-sm:hidden"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="text-base-content/80 size-4"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"></path></svg><!----></span><!----></button>
+// content_script_silent_timer.js
+(function() {
+  const dialog = document.querySelector('dialog.modal');
+  if (!dialog) return;
+
+  // 保存原始 showModal 方法
+  const originalShowModal = dialog.showModal.bind(dialog);
+
+  // hook showModal
+  dialog.showModal = function(...args) {
+    if (dialog.hasAttribute('data-silent')) {
+      console.log('Silent mode: preventing modal display');
+      return; // 插件触发，不显示弹窗
+    }
+    return originalShowModal(...args); // 页面触发，正常显示
+  };
+
+  // 核心函数：插件触发 Share + 定时关闭
+  function openShareSilentlyWithTimer(delay = 500) {
+    // 1️⃣ 标记 silent
+    dialog.setAttribute('data-silent', '');
+
+    // 2️⃣ 点击页面按钮触发 Share
+    const shareBtn = document.querySelector('.share-btn');
+    if (!shareBtn) return;
+    shareBtn.click();
+
+    // 3️⃣ 定时关闭 dialog（ms）
+    setTimeout(() => {
+      dialog.removeAttribute('data-silent');
+      dialog.removeAttribute('open');
+      console.log('Dialog closed after timer');
+    }, delay);
+  }
+
+  // 暴露给插件按钮调用
+  window.openShareSilentlyWithTimer = openShareSilentlyWithTimer;
+
+})();
