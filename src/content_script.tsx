@@ -701,6 +701,9 @@ const placeOverlay = (dataUrl: string) => {
   }
   if (controlPanelElement) {
     console.log('Removing existing control panel element');
+    // Remove event listeners to prevent memory leaks and unexpected behavior
+    document.removeEventListener('mousemove', controlPanelDrag);
+    document.removeEventListener('mouseup', controlPanelDragEnd);
     controlPanelElement.remove();
   }
 
@@ -854,16 +857,6 @@ const placeOverlay = (dataUrl: string) => {
         }
       }
       console.log('Finished maximizing control panel');
-    }
-  });
-
-  // Add click event to title for toggling when minimized
-  title.addEventListener('click', (e) => {
-    // Don't expand panel when clicking on 'C' in minimized state
-    // Only the toggle button (+/-) should control expansion
-    if (isPanelMinimized) {
-      console.log('Control panel title clicked in minimized state, ignoring');
-      // Do nothing - let the user click the toggle button to expand
     }
   });
 
