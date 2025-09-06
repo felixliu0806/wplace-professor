@@ -22,6 +22,8 @@ let isListenerSetUp = false;
 
 // Constants for localStorage
 const SAVE_LOCATIONS_KEY = 'wplace_professor_save_locations';
+const PANEL_STATE_KEY = 'wplace_professor_panel_state'; // 新增的面板状态键
+const CONTROL_PANEL_STATE_KEY = 'wplace_professor_control_panel_state'; // Control面板状态键
 const MAX_NAME_LENGTH = 10;
 
 // Type definition for saved locations
@@ -690,12 +692,16 @@ const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRendering
 // Function to create and place the overlay
 const placeOverlay = (dataUrl: string) => {
   // Remove existing overlay and control panel if any
+  // But don't remove the save locations panel
   if (overlayElement) {
     overlayElement.remove();
   }
   if (controlPanelElement) {
     controlPanelElement.remove();
   }
+
+  // Note: We intentionally don't remove saveLocationsPanelElement here
+  // to preserve its position and state
 
   // Create overlay container
   overlayElement = document.createElement('div');
@@ -732,9 +738,23 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.fontFamily = 'Arial, sans-serif';
   controlPanelElement.style.minWidth = '180px';
   controlPanelElement.style.fontSize = '14px'; // Base font size
+  controlPanelElement.style.userSelect = 'none'; // Prevent text selection
 
   // State for panel minimized/maximized
   let isPanelMinimized = false;
+  
+  // Try to restore panel state from localStorage
+  try {
+    const savedState = localStorage.getItem(CONTROL_PANEL_STATE_KEY);
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      isPanelMinimized = state.isMinimized || false;
+    }
+  } catch (e) {
+    if (__DEV__) {
+      console.error('Error parsing control panel state:', e);
+    }
+  }
 
   // Create control panel title with minimize/maximize button
   const titleContainer = document.createElement('div');
@@ -744,7 +764,7 @@ const placeOverlay = (dataUrl: string) => {
   titleContainer.style.marginBottom = '8px';
 
   const title = document.createElement('h3');
-  title.textContent = 'Controls';
+  title.textContent = 'Control'; // Changed from 'Controls'
   title.style.margin = '0';
   title.style.fontSize = '18px';
   title.style.fontWeight = 'bold';
@@ -765,11 +785,22 @@ const placeOverlay = (dataUrl: string) => {
     e.stopPropagation();
     isPanelMinimized = !isPanelMinimized;
 
+    // Save panel state to localStorage
+    try {
+      localStorage.setItem(CONTROL_PANEL_STATE_KEY, JSON.stringify({ isMinimized: isPanelMinimized }));
+    } catch (e) {
+      if (__DEV__) {
+        console.error('Error saving control panel state:', e);
+      }
+    }
+
     if (isPanelMinimized) {
       // Minimize panel
       controlPanelElement!.style.minWidth = '40px';
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
+      title.textContent = 'C'; // Show only first letter
+      toggleButton.style.display = ''; // Keep toggle button visible
       toggleButton.textContent = '+'; // Maximize symbol
 
       // Hide all children except titleContainer
@@ -783,6 +814,8 @@ const placeOverlay = (dataUrl: string) => {
       controlPanelElement!.style.minWidth = '180px';
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
+      title.textContent = 'Control'; // Restore full title
+      toggleButton.style.display = ''; // Show toggle button
       toggleButton.textContent = '−'; // Minimize symbol
 
       // Show all children and restore their original display properties
@@ -804,6 +837,16 @@ const placeOverlay = (dataUrl: string) => {
           colorPanelWrapper.style.display = '';
         }
       }
+    }
+  });
+
+  // Add click event to title for toggling when minimized
+  title.addEventListener('click', (e) => {
+    // Don't expand panel when clicking on 'C' in minimized state
+    // Only the toggle button (+/-) should control expansion
+    if (isPanelMinimized) {
+      console.log('Control panel title clicked in minimized state, ignoring');
+      // Do nothing - let the user click the toggle button to expand
     }
   });
 
@@ -1290,82 +1333,92 @@ const placeOverlay = (dataUrl: string) => {
     }
   });
 
-  // Make the overlay draggable
-  let isDragging = false;
-  let currentX: number = 0;
-  let currentY: number = 0;
-  let initialX: number = 0;
-  let initialY: number = 0;
-  let xOffset = 0;
-  let yOffset = 0;
+  // Make the panel draggable
+  let isControlPanelDragging = false;
+  let controlPanelCurrentX: number = 0;
+  let controlPanelCurrentY: number = 0;
+  let controlPanelInitialX: number = 0;
+  let controlPanelInitialY: number = 0;
+  let controlPanelXOffset = 0;
+  let controlPanelYOffset = 0;
 
-  overlayElement.addEventListener('mousedown', dragStart);
-  overlayElement.addEventListener('touchstart', dragStart);
+  function controlPanelDragStart(e: MouseEvent) {
+    // Allow dragging from anywhere except buttons
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'BUTTON') {
+      controlPanelInitialX = e.clientX - controlPanelXOffset;
+      controlPanelInitialY = e.clientY - controlPanelYOffset;
 
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('touchmove', drag);
-
-  document.addEventListener('mouseup', dragEnd);
-  document.addEventListener('touchend', dragEnd);
-
-  function dragStart(e: MouseEvent | TouchEvent) {
-    // Only drag when clicking on the overlay itself, not on controls
-    if (e.target === overlayElement || e.target === canvas) {
-      if (e.type === 'touchstart') {
-        initialX = (e as TouchEvent).touches[0].clientX - xOffset;
-        initialY = (e as TouchEvent).touches[0].clientY - yOffset;
-      } else {
-        initialX = (e as MouseEvent).clientX - xOffset;
-        initialY = (e as MouseEvent).clientY - yOffset;
-      }
-
-      isDragging = true;
+      isControlPanelDragging = true;
+      e.preventDefault(); // Prevent text selection
+      e.stopPropagation(); // Prevent other event handlers
     }
   }
 
-  function drag(e: MouseEvent | TouchEvent) {
-    if (isDragging) {
+  function controlPanelDrag(e: MouseEvent) {
+    if (isControlPanelDragging) {
+      controlPanelCurrentX = e.clientX - controlPanelInitialX;
+      controlPanelCurrentY = e.clientY - controlPanelInitialY;
+
+      controlPanelXOffset = controlPanelCurrentX;
+      controlPanelYOffset = controlPanelCurrentY;
+
+      setControlPanelTranslate(controlPanelCurrentX, controlPanelCurrentY, controlPanelElement!);
+      
+      // Prevent any default behavior that might cause expansion
       e.preventDefault();
-
-      if (e.type === 'touchmove') {
-        currentX = (e as TouchEvent).touches[0].clientX - initialX;
-        currentY = (e as TouchEvent).touches[0].clientY - initialY;
-      } else {
-        currentX = (e as MouseEvent).clientX - initialX;
-        currentY = (e as MouseEvent).clientY - initialY;
-      }
-
-      xOffset = currentX;
-      yOffset = currentY;
-
-      if (overlayElement) {
-        setTranslate(currentX, currentY, overlayElement);
-      }
+      e.stopPropagation();
     }
   }
 
-  function dragEnd() {
-    initialX = currentX;
-    initialY = currentY;
+  function controlPanelDragEnd() {
+    console.log('Control panel drag ended, isPanelMinimized:', isPanelMinimized);
+    controlPanelInitialX = controlPanelCurrentX;
+    controlPanelInitialY = controlPanelCurrentY;
 
-    isDragging = false;
-
-    // Update base position after dragging
-    // updateBasePosition(); // This function is not defined in this scope
-  }
-
-  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
-    if (el) {
-      el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+    isControlPanelDragging = false;
+    
+    // Always ensure panel stays in its current state (minimized or expanded)
+    if (isPanelMinimized) {
+      console.log('Control panel was minimized, restoring minimized state');
+      // Force minimized styles to ensure panel stays minimized
+      setTimeout(() => {
+        if (isPanelMinimized) { // Double-check the state
+          controlPanelElement!.style.minWidth = '40px';
+          controlPanelElement!.style.padding = '8px';
+          titleContainer.style.marginBottom = '0';
+          title.textContent = 'C';
+          toggleButton.textContent = '+';
+          
+          // Ensure all children except titleContainer are hidden
+          Array.from(controlPanelElement!.children).forEach(child => {
+            if (child !== titleContainer) {
+              (child as HTMLElement).style.display = 'none';
+            }
+          });
+        }
+      }, 0);
     }
   }
+
+  function setControlPanelTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+  }
+
+  // Attach event listeners for dragging
+  controlPanelElement.addEventListener('mousedown', controlPanelDragStart);
+  document.addEventListener('mousemove', controlPanelDrag);
+  document.addEventListener('mouseup', controlPanelDragEnd);
+
+  // Prevent text selection when dragging
+  controlPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
 
   if (__DEV__) {
     console.log('Overlay placed at center of screen with separate control panel');
   }
 
-  // Create the save locations panel
-  createSaveLocationsPanel();
+  // Note: We don't create the save locations panel here to preserve its state
+  // The save locations panel is created once on page load and should not be recreated
 };
 
 // Set up click listener for overlay placement
@@ -1442,6 +1495,11 @@ window.addEventListener('load', () => {
   console.log('Page fully loaded, re-setting up message listener');
   isListenerSetUp = false; // Reset the flag
   setupMessageListener();
+  
+  // Create the save locations panel on page load only for wplace.live
+  if (window.location.hostname.includes('wplace.live')) {
+    createSaveLocationsPanel();
+  }
 });
 
 // Handle page visibility changes (tab switching)
@@ -1738,24 +1796,37 @@ const createSaveLocationsPanel = () => {
   saveLocationsPanelElement.id = 'wplace-professor-save-locations-panel';
   saveLocationsPanelElement.style.position = 'fixed';
   saveLocationsPanelElement.style.left = '20px';
-  saveLocationsPanelElement.style.top = '50%';
-  saveLocationsPanelElement.style.transform = 'translateY(-50%)';
+  saveLocationsPanelElement.style.top = '210px'; // Changed to 210px
   saveLocationsPanelElement.style.zIndex = '99997';
   saveLocationsPanelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
   saveLocationsPanelElement.style.padding = '12px';
   saveLocationsPanelElement.style.borderRadius = '6px';
   saveLocationsPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   saveLocationsPanelElement.style.fontFamily = 'Arial, sans-serif';
-  saveLocationsPanelElement.style.minWidth = '200px'; // Increased from 180px
-  saveLocationsPanelElement.style.width = 'fit-content'; // Use fit-content to allow shrinking
-  saveLocationsPanelElement.style.maxWidth = '200px'; // Increased from 180px
+  saveLocationsPanelElement.style.minWidth = '200px';
+  saveLocationsPanelElement.style.width = '200px';
+  saveLocationsPanelElement.style.maxWidth = '200px';
   saveLocationsPanelElement.style.fontSize = '14px';
   saveLocationsPanelElement.style.display = 'flex';
   saveLocationsPanelElement.style.flexDirection = 'column';
-  saveLocationsPanelElement.style.boxSizing = 'border-box'; // Include padding and border in width calculations
+  saveLocationsPanelElement.style.boxSizing = 'border-box';
+  saveLocationsPanelElement.style.userSelect = 'none';
 
   // State for panel minimized/maximized
   let isPanelMinimized = false;
+  
+  // Try to restore panel state from localStorage
+  try {
+    const savedState = localStorage.getItem(PANEL_STATE_KEY);
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      isPanelMinimized = state.isMinimized || false;
+    }
+  } catch (e) {
+    if (__DEV__) {
+      console.error('Error parsing panel state:', e);
+    }
+  }
 
   // Create panel header with title and toggle button
   const header = document.createElement('div');
@@ -1765,7 +1836,7 @@ const createSaveLocationsPanel = () => {
   header.style.marginBottom = '8px';
 
   const title = document.createElement('h3');
-  title.textContent = 'Locations'; // Changed from 'Saved Locations'
+  title.textContent = 'Location'; // Changed from 'Saved Locations'
   title.style.margin = '0';
   title.style.fontSize = '16px';
   title.style.fontWeight = 'bold';
@@ -1785,14 +1856,25 @@ const createSaveLocationsPanel = () => {
   toggleButton.addEventListener('click', (e) => {
     e.stopPropagation();
     isPanelMinimized = !isPanelMinimized;
+    
+    // Save panel state to localStorage
+    try {
+      localStorage.setItem(PANEL_STATE_KEY, JSON.stringify({ isMinimized: isPanelMinimized }));
+    } catch (e) {
+      if (__DEV__) {
+        console.error('Error saving panel state:', e);
+      }
+    }
 
     if (isPanelMinimized) {
-      // Minimize panel
+      // Minimize panel - keep same width as Control panel when minimized
       saveLocationsPanelElement!.style.minWidth = '40px';
-      saveLocationsPanelElement!.style.width = '40px'; // Force width to 40px
-      saveLocationsPanelElement!.style.maxWidth = '40px'; // Force max-width to 40px
+      saveLocationsPanelElement!.style.width = '40px';
+      saveLocationsPanelElement!.style.maxWidth = '40px';
       saveLocationsPanelElement!.style.padding = '8px';
       header.style.marginBottom = '0';
+      title.textContent = 'L'; // Show only first letter
+      toggleButton.style.display = ''; // Keep toggle button visible
       toggleButton.textContent = '+'; // Maximize symbol
 
       // Hide content elements container
@@ -1800,20 +1882,15 @@ const createSaveLocationsPanel = () => {
       if (contentContainer) {
         (contentContainer as HTMLElement).style.display = 'none';
       }
-      
-      // Debug: Log panel width after minimizing
-      setTimeout(() => {
-        if (__DEV__) {
-          console.log('Panel minimized width:', saveLocationsPanelElement!.offsetWidth);
-        }
-      }, 0);
     } else {
-      // Maximize panel - use a reasonable width for content display
-      saveLocationsPanelElement!.style.minWidth = '200px'; // Increased from 180px
-      saveLocationsPanelElement!.style.width = 'fit-content'; // Reset width to fit content
-      saveLocationsPanelElement!.style.maxWidth = '200px'; // Increased from 180px
+      // Maximize panel
+      saveLocationsPanelElement!.style.minWidth = '200px';
+      saveLocationsPanelElement!.style.width = '200px';
+      saveLocationsPanelElement!.style.maxWidth = '200px';
       saveLocationsPanelElement!.style.padding = '12px';
       header.style.marginBottom = '8px';
+      title.textContent = 'Location'; // Restore full title
+      toggleButton.style.display = ''; // Show toggle button
       toggleButton.textContent = '−'; // Minimize symbol
 
       // Show content elements container
@@ -1827,8 +1904,8 @@ const createSaveLocationsPanel = () => {
           // Reset font sizes that might have been changed when minimized
           const socialButtons = socialButtonsContainer.querySelectorAll('button');
           socialButtons.forEach(button => {
-            (button as HTMLElement).style.fontSize = '13px'; // Increased from 12px
-            (button as HTMLElement).style.padding = '6px'; // Increased from 4px
+            (button as HTMLElement).style.fontSize = '13px';
+            (button as HTMLElement).style.padding = '6px';
           });
         }
         
@@ -1847,13 +1924,16 @@ const createSaveLocationsPanel = () => {
 
       // Refresh the saved locations list
       refreshSavedLocationsList();
-      
-      // Debug: Log panel width after maximizing
-      setTimeout(() => {
-        if (__DEV__) {
-          console.log('Panel maximized width:', saveLocationsPanelElement!.offsetWidth);
-        }
-      }, 0);
+    }
+  });
+
+  // Add click event to title for toggling when minimized
+  title.addEventListener('click', (e) => {
+    // Don't expand panel when clicking on 'C' or 'L' in minimized state
+    // Only the toggle button (+/-) should control expansion
+    if (isPanelMinimized) {
+      console.log('Control panel title clicked in minimized state, ignoring');
+      // Do nothing - let the user click the toggle button to expand
     }
   });
 
@@ -1863,12 +1943,15 @@ const createSaveLocationsPanel = () => {
 
   // Create save current location button
   const saveButton = document.createElement('button');
-  saveButton.textContent = 'Save Location'; // Changed from 'Save Current Location'
+  saveButton.textContent = 'Save'; // Changed from 'Save Current Location'
   saveButton.style.background = '#4CAF50';
   saveButton.style.color = 'white';
   saveButton.style.border = 'none';
   saveButton.style.borderRadius = '3px';
   saveButton.style.width = '100%';
+  saveButton.style.padding = '8px 12px'; // Increase padding to make button taller
+  saveButton.style.fontSize = '14px'; // Slightly increase font size
+  saveButton.style.fontWeight = 'bold'; // Make text bold
   // saveButton.style.flex = '1'; // Remove flex grow
   // saveButton.style.marginRight = '4px'; // Remove margin
 
@@ -1879,16 +1962,6 @@ const createSaveLocationsPanel = () => {
   shareCard.style.borderRadius = '4px';
   shareCard.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
   
-  // Create share card title
-  const shareCardTitle = document.createElement('h4');
-  shareCardTitle.textContent = 'Share';
-  shareCardTitle.style.margin = '0';
-  shareCardTitle.style.padding = '8px';
-  shareCardTitle.style.fontSize = '14px';
-  shareCardTitle.style.fontWeight = 'bold';
-  shareCardTitle.style.color = '#333';
-  shareCardTitle.style.borderBottom = '1px solid #ddd';
-  
   // Create social media sharing buttons container
   const socialButtonsContainer = document.createElement('div');
   socialButtonsContainer.className = 'social-buttons-container'; // Add class for querying
@@ -1897,8 +1970,7 @@ const createSaveLocationsPanel = () => {
   socialButtonsContainer.style.gap = '4px';
   socialButtonsContainer.style.padding = '8px';
 
-  // Add title and buttons container to the card
-  shareCard.appendChild(shareCardTitle);
+  // Add buttons container to the card
   shareCard.appendChild(socialButtonsContainer);
 
   // Social media icons data (simplified paths for demonstration)
@@ -2018,7 +2090,7 @@ const createSaveLocationsPanel = () => {
   
   // Create delete all locations button
   const deleteAllButton = document.createElement('button');
-  deleteAllButton.textContent = 'Delete All Locations';
+  deleteAllButton.textContent = 'Delete All';
   deleteAllButton.style.background = '#f44336';
   deleteAllButton.style.color = 'white';
   deleteAllButton.style.border = 'none';
@@ -2028,6 +2100,7 @@ const createSaveLocationsPanel = () => {
   deleteAllButton.style.padding = '6px 10px';
   deleteAllButton.style.cursor = 'pointer';
   deleteAllButton.style.fontSize = '13px';
+  deleteAllButton.style.fontWeight = 'bold'; // Make text bold
   
   deleteAllButton.addEventListener('click', () => {
     // Use custom modal instead of alert
@@ -2048,8 +2121,120 @@ const createSaveLocationsPanel = () => {
   // Load saved locations
   refreshSavedLocationsList();
 
-  // // Make the panel draggable
-  // makePanelDraggable(saveLocationsPanelElement);
+  // Make the panel draggable
+  let isLocationPanelDragging = false;
+  let locationPanelCurrentX: number = 0;
+  let locationPanelCurrentY: number = 0;
+  let locationPanelInitialX: number = 0;
+  let locationPanelInitialY: number = 0;
+  let locationPanelXOffset = 0;
+  let locationPanelYOffset = 0;
+
+  // Get initial position from the panel's style
+  const rect = saveLocationsPanelElement!.getBoundingClientRect();
+  locationPanelXOffset = rect.left;
+  locationPanelYOffset = rect.top;
+  locationPanelCurrentX = locationPanelXOffset;
+  locationPanelCurrentY = locationPanelYOffset;
+
+  function locationPanelDragStart(e: MouseEvent) {
+    // Allow dragging from anywhere except buttons
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'BUTTON') {
+      // Get current position directly from the element
+      const rect = saveLocationsPanelElement!.getBoundingClientRect();
+      locationPanelXOffset = rect.left;
+      locationPanelYOffset = rect.top;
+      
+      locationPanelInitialX = e.clientX - locationPanelXOffset;
+      locationPanelInitialY = e.clientY - locationPanelYOffset;
+
+      isLocationPanelDragging = true;
+      e.preventDefault(); // Prevent text selection
+      e.stopPropagation(); // Prevent other event handlers
+    }
+  }
+
+  function locationPanelDrag(e: MouseEvent) {
+    if (isLocationPanelDragging) {
+      locationPanelCurrentX = e.clientX - locationPanelInitialX;
+      locationPanelCurrentY = e.clientY - locationPanelInitialY;
+
+      locationPanelXOffset = locationPanelCurrentX;
+      locationPanelYOffset = locationPanelCurrentY;
+
+      setLocationPanelTranslate(locationPanelCurrentX, locationPanelCurrentY, saveLocationsPanelElement!);
+      
+      // Prevent any default behavior that might cause expansion
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+
+  function locationPanelDragEnd() {
+    console.log('Location panel drag ended, isPanelMinimized:', isPanelMinimized);
+    locationPanelInitialX = locationPanelCurrentX;
+    locationPanelInitialY = locationPanelCurrentY;
+
+    isLocationPanelDragging = false;
+    
+    // Always ensure panel stays in its current state (minimized or expanded)
+    if (isPanelMinimized) {
+      console.log('Location panel was minimized, restoring minimized state');
+      // Force minimized styles to ensure panel stays minimized
+      setTimeout(() => {
+        if (isPanelMinimized) { // Double-check the state
+          saveLocationsPanelElement!.style.minWidth = '40px';
+          saveLocationsPanelElement!.style.width = '40px';
+          saveLocationsPanelElement!.style.maxWidth = '40px';
+          saveLocationsPanelElement!.style.padding = '8px';
+          header.style.marginBottom = '0';
+          title.textContent = 'L';
+          toggleButton.textContent = '+';
+          
+          // Ensure content is hidden
+          const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+          if (contentContainer) {
+            (contentContainer as HTMLElement).style.display = 'none';
+          }
+        }
+      }, 0);
+    }
+  }
+
+  function setLocationPanelTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    // Remove the transform style that was used for initial positioning
+    el.style.transform = '';
+    // Set position using left and top instead
+    el.style.left = `${xPos}px`;
+    el.style.top = `${yPos}px`;
+  }
+
+  // Attach event listeners for dragging
+  saveLocationsPanelElement.addEventListener('mousedown', locationPanelDragStart);
+  document.addEventListener('mousemove', locationPanelDrag);
+  document.addEventListener('mouseup', locationPanelDragEnd);
+
+  // Prevent text selection when dragging
+  saveLocationsPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
+  
+  // Apply initial state based on isPanelMinimized
+  if (isPanelMinimized) {
+    // Apply minimized styles immediately
+    saveLocationsPanelElement!.style.minWidth = '40px';
+    saveLocationsPanelElement!.style.width = '40px';
+    saveLocationsPanelElement!.style.maxWidth = '40px';
+    saveLocationsPanelElement!.style.padding = '8px';
+    header.style.marginBottom = '0';
+    title.textContent = 'L';
+    toggleButton.textContent = '+';
+    
+    // Hide content elements container
+    const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+    if (contentContainer) {
+      (contentContainer as HTMLElement).style.display = 'none';
+    }
+  }
 };
 
 // Function to delete a saved location
@@ -2058,6 +2243,178 @@ const deleteSavedLocation = (id: string) => {
   const filteredLocations = savedLocations.filter(location => location.id !== id);
   localStorage.setItem(SAVE_LOCATIONS_KEY, JSON.stringify(filteredLocations));
   refreshSavedLocationsList();
+};
+
+// Function to show a custom modal for confirming location deletion
+const showDeleteLocationModal = (location: SavedLocation) => {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.id = 'wplace-delete-location-modal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '100000';
+  modal.style.userSelect = 'none'; // Prevent text selection on the backdrop
+
+  // Create modal content - similar to control panel style
+  const modalContent = document.createElement('div');
+  modalContent.id = 'wplace-delete-location-modal-content';
+  modalContent.style.position = 'fixed';
+  modalContent.style.top = '50%';
+  modalContent.style.left = '50%';
+  modalContent.style.transform = 'translate(-50%, -50%)';
+  modalContent.style.zIndex = '100001';
+  modalContent.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  modalContent.style.padding = '12px';
+  modalContent.style.borderRadius = '6px';
+  modalContent.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  modalContent.style.fontFamily = 'Arial, sans-serif';
+  modalContent.style.minWidth = '200px';
+  modalContent.style.fontSize = '14px';
+
+  // Create title container with drag handle
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.cursor = 'move'; // Show that this area is draggable
+
+  // Create title
+  const title = document.createElement('h3');
+  title.textContent = 'Delete Location';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  title.style.flex = '1';
+  title.style.cursor = 'move'; // Also draggable
+
+  titleContainer.appendChild(title);
+
+  // Create message
+  const message = document.createElement('div');
+  message.textContent = `Are you sure you want to delete "${location.name}"?`;
+  message.style.fontSize = '13px';
+  message.style.marginBottom = '12px';
+  message.style.color = '#555';
+
+  // Create buttons container
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.justifyContent = 'flex-end';
+  buttonsContainer.style.gap = '6px';
+
+  // Create delete button
+  const deleteButton = document.createElement('button');
+  deleteButton.textContent = 'Delete';
+  deleteButton.style.background = '#f44336';
+  deleteButton.style.color = 'white';
+  deleteButton.style.border = 'none';
+  deleteButton.style.borderRadius = '3px';
+  deleteButton.style.padding = '6px 10px';
+  deleteButton.style.cursor = 'pointer';
+  deleteButton.style.fontSize = '13px';
+  deleteButton.style.fontWeight = 'bold'; // Make text bold
+
+  // Create cancel button
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.background = '#e0e0e0';
+  cancelButton.style.color = '#333';
+  cancelButton.style.border = 'none';
+  cancelButton.style.borderRadius = '3px';
+  cancelButton.style.padding = '6px 10px';
+  cancelButton.style.cursor = 'pointer';
+  cancelButton.style.fontSize = '13px';
+  cancelButton.style.fontWeight = 'bold'; // Make text bold
+
+  // Add event listeners
+  deleteButton.addEventListener('click', () => {
+    deleteSavedLocation(location.id);
+    document.body.removeChild(modal);
+  });
+
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  // Allow closing with Escape key
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.body.removeChild(modal);
+    }
+  });
+
+  // Make the modal draggable like the control panel
+  let isDragging = false;
+  let currentX: number = 0;
+  let currentY: number = 0;
+  let initialX: number = 0;
+  let initialY: number = 0;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  function dragStart(e: MouseEvent) {
+    // Only drag when clicking on the title container or title
+    if (e.target === titleContainer || e.target === title) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      isDragging = true;
+      e.preventDefault(); // Prevent text selection
+    }
+  }
+
+  function drag(e: MouseEvent) {
+    if (isDragging) {
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, modalContent);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+
+    isDragging = false;
+  }
+
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
+  }
+
+  // Attach event listeners for dragging
+  titleContainer.addEventListener('mousedown', dragStart);
+  title.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+
+  // Prevent text selection when dragging
+  titleContainer.addEventListener('selectstart', (e) => e.preventDefault());
+  title.addEventListener('selectstart', (e) => e.preventDefault());
+
+  // Assemble modal
+  modalContent.appendChild(titleContainer);
+  modalContent.appendChild(message);
+  modalContent.appendChild(buttonsContainer);
+  
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(deleteButton);
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
 };
 
 // Function to share to social media
@@ -2209,6 +2566,7 @@ const refreshSavedLocationsList = () => {
     openButton.style.padding = '2px 6px';
     openButton.style.cursor = 'pointer';
     openButton.style.fontSize = '11px';
+    openButton.style.fontWeight = 'bold'; // Make text bold
     openButton.addEventListener('click', () => {
       window.open(location.url, '_blank');
     });
@@ -2223,10 +2581,9 @@ const refreshSavedLocationsList = () => {
     deleteButton.style.padding = '2px 6px';
     deleteButton.style.cursor = 'pointer';
     deleteButton.style.fontSize = '11px';
+    deleteButton.style.fontWeight = 'bold'; // Make text bold
     deleteButton.addEventListener('click', () => {
-      if (confirm(`Are you sure you want to delete "${location.name}"?`)) {
-        deleteSavedLocation(location.id);
-      }
+      showDeleteLocationModal(location);
     });
 
     buttonsContainer.appendChild(openButton);
@@ -2335,7 +2692,7 @@ const showLocationNameModal = (url: string, shareButton: Element | null) => {
 
   // Create title
   const title = document.createElement('h3');
-  title.textContent = 'Save Location';
+  title.textContent = 'Save';
   title.style.margin = '0';
   title.style.fontSize = '16px';
   title.style.fontWeight = 'bold';
@@ -2579,7 +2936,7 @@ const showDeleteAllLocationsModal = () => {
 
   // Create title
   const title = document.createElement('h3');
-  title.textContent = 'Delete All Locations';
+  title.textContent = 'Delete All';
   title.style.margin = '0';
   title.style.fontSize = '16px';
   title.style.fontWeight = 'bold';
