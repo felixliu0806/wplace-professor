@@ -691,12 +691,16 @@ const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRendering
 
 // Function to create and place the overlay
 const placeOverlay = (dataUrl: string) => {
+  console.log('Creating and placing overlay');
+  
   // Remove existing overlay and control panel if any
   // But don't remove the save locations panel
   if (overlayElement) {
+    console.log('Removing existing overlay element');
     overlayElement.remove();
   }
   if (controlPanelElement) {
+    console.log('Removing existing control panel element');
     controlPanelElement.remove();
   }
 
@@ -704,6 +708,7 @@ const placeOverlay = (dataUrl: string) => {
   // to preserve its position and state
 
   // Create overlay container
+  console.log('Creating overlay container');
   overlayElement = document.createElement('div');
   overlayElement.id = 'wplace-professor-overlay';
   overlayElement.style.position = 'fixed';
@@ -716,6 +721,7 @@ const placeOverlay = (dataUrl: string) => {
   overlayElement.style.pointerEvents = 'none'; // Allow clicks to pass through to the canvas below
 
   // Create canvas for the pixel art
+  console.log('Creating canvas for pixel art');
   const canvas = document.createElement('canvas');
   canvas.style.imageRendering = 'pixelated'; // For sharp pixel edges
   canvas.style.opacity = '0.9'; // Higher transparency
@@ -725,6 +731,7 @@ const placeOverlay = (dataUrl: string) => {
   document.body.appendChild(overlayElement);
 
   // Create separate control panel
+  console.log('Creating control panel');
   controlPanelElement = document.createElement('div');
   controlPanelElement.id = 'wplace-professor-control-panel';
   controlPanelElement.style.position = 'fixed';
@@ -743,10 +750,12 @@ const placeOverlay = (dataUrl: string) => {
   // State for panel minimized/maximized
   // When placing overlay, always initialize panel as expanded (not minimized)
   let isPanelMinimized = false;
+  console.log('Control panel initialized with isPanelMinimized:', isPanelMinimized);
   
   // Save the initial state to localStorage to ensure consistency
   try {
     localStorage.setItem(CONTROL_PANEL_STATE_KEY, JSON.stringify({ isMinimized: false }));
+    console.log('Initial control panel state saved to localStorage:', { isMinimized: false });
   } catch (e) {
     if (__DEV__) {
       console.error('Error saving initial control panel state:', e);
@@ -754,6 +763,7 @@ const placeOverlay = (dataUrl: string) => {
   }
 
   // Create control panel title with minimize/maximize button
+  console.log('Creating control panel title container');
   const titleContainer = document.createElement('div');
   titleContainer.style.display = 'flex';
   titleContainer.style.justifyContent = 'space-between';
@@ -780,11 +790,15 @@ const placeOverlay = (dataUrl: string) => {
 
   toggleButton.addEventListener('click', (e) => {
     e.stopPropagation();
+    const previousState = isPanelMinimized;
     isPanelMinimized = !isPanelMinimized;
+    
+    console.log(`Control panel toggle button clicked. State changed from ${previousState} to ${isPanelMinimized}`);
 
     // Save panel state to localStorage
     try {
       localStorage.setItem(CONTROL_PANEL_STATE_KEY, JSON.stringify({ isMinimized: isPanelMinimized }));
+      console.log('Control panel state saved to localStorage:', { isMinimized: isPanelMinimized });
     } catch (e) {
       if (__DEV__) {
         console.error('Error saving control panel state:', e);
@@ -793,11 +807,14 @@ const placeOverlay = (dataUrl: string) => {
 
     if (isPanelMinimized) {
       // Minimize panel
+      console.log('Minimizing control panel');
       controlPanelElement!.style.minWidth = '40px';
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
       title.textContent = 'C'; // Show only first letter
       toggleButton.textContent = '+'; // Maximize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Hide all children except titleContainer
       Array.from(controlPanelElement!.children).forEach(child => {
@@ -805,13 +822,17 @@ const placeOverlay = (dataUrl: string) => {
           (child as HTMLElement).style.display = 'none';
         }
       });
+      console.log('Finished minimizing control panel');
     } else {
       // Maximize panel
+      console.log('Maximizing control panel');
       controlPanelElement!.style.minWidth = '180px';
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       title.textContent = 'Control'; // Restore full title
       toggleButton.textContent = '−'; // Minimize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Show all children and restore their original display properties
       opacityLabel.style.display = '';
@@ -832,6 +853,7 @@ const placeOverlay = (dataUrl: string) => {
           colorPanelWrapper.style.display = '';
         }
       }
+      console.log('Finished maximizing control panel');
     }
   });
 
@@ -1053,6 +1075,7 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.appendChild(modeToggleBtn);
   controlPanelElement.appendChild(closeBtn);
   document.body.appendChild(controlPanelElement);
+  console.log('Control panel added to document body');
 
   // Load image and draw it on canvas with pixel borders
   const img = new Image();
@@ -1318,6 +1341,7 @@ const placeOverlay = (dataUrl: string) => {
   // Close button event
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    console.log('Close button clicked, removing overlay and control panel');
     if (overlayElement) {
       overlayElement.remove();
       overlayElement = null;
@@ -1341,6 +1365,7 @@ const placeOverlay = (dataUrl: string) => {
     // Allow dragging from anywhere except buttons
     const target = e.target as HTMLElement;
     if (target.tagName !== 'BUTTON') {
+      console.log('Control panel drag start');
       controlPanelInitialX = e.clientX - controlPanelXOffset;
       controlPanelInitialY = e.clientY - controlPanelYOffset;
 
@@ -1352,6 +1377,7 @@ const placeOverlay = (dataUrl: string) => {
 
   function controlPanelDrag(e: MouseEvent) {
     if (isControlPanelDragging) {
+      console.log('Control panel dragging');
       controlPanelCurrentX = e.clientX - controlPanelInitialX;
       controlPanelCurrentY = e.clientY - controlPanelInitialY;
 
@@ -1379,6 +1405,7 @@ const placeOverlay = (dataUrl: string) => {
       // Force minimized styles to ensure panel stays minimized
       setTimeout(() => {
         if (isPanelMinimized) { // Double-check the state
+          console.log('Applying minimized styles in drag end');
           controlPanelElement!.style.minWidth = '40px';
           controlPanelElement!.style.padding = '8px';
           titleContainer.style.marginBottom = '0';
@@ -1391,6 +1418,7 @@ const placeOverlay = (dataUrl: string) => {
               (child as HTMLElement).style.display = 'none';
             }
           });
+          console.log('Finished applying minimized styles in drag end');
         }
       }, 0);
     }
@@ -1781,12 +1809,16 @@ const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: numb
 
 // Function to create and manage the save locations panel
 const createSaveLocationsPanel = () => {
+  console.log('Creating save locations panel');
+  
   // Remove existing save locations panel if any
   if (saveLocationsPanelElement) {
+    console.log('Removing existing save locations panel element');
     saveLocationsPanelElement.remove();
   }
 
   // Create save locations panel
+  console.log('Creating new save locations panel element');
   saveLocationsPanelElement = document.createElement('div');
   saveLocationsPanelElement.id = 'wplace-professor-save-locations-panel';
   saveLocationsPanelElement.style.position = 'fixed';
@@ -1810,10 +1842,12 @@ const createSaveLocationsPanel = () => {
   // State for panel minimized/maximized
   // When creating the panel, always initialize it as expanded (not minimized)
   let isPanelMinimized = false;
+  console.log('Save locations panel initialized with isPanelMinimized:', isPanelMinimized);
   
   // Save the initial state to localStorage to ensure consistency
   try {
     localStorage.setItem(PANEL_STATE_KEY, JSON.stringify({ isMinimized: false }));
+    console.log('Initial save locations panel state saved to localStorage:', { isMinimized: false });
   } catch (e) {
     if (__DEV__) {
       console.error('Error saving initial panel state:', e);
@@ -1821,6 +1855,7 @@ const createSaveLocationsPanel = () => {
   }
 
   // Create panel header with title and toggle button
+  console.log('Creating panel header');
   const header = document.createElement('div');
   header.style.display = 'flex';
   header.style.justifyContent = 'space-between';
@@ -1847,11 +1882,15 @@ const createSaveLocationsPanel = () => {
 
   toggleButton.addEventListener('click', (e) => {
     e.stopPropagation();
+    const previousState = isPanelMinimized;
     isPanelMinimized = !isPanelMinimized;
+    
+    console.log(`Save locations panel toggle button clicked. State changed from ${previousState} to ${isPanelMinimized}`);
     
     // Save panel state to localStorage
     try {
       localStorage.setItem(PANEL_STATE_KEY, JSON.stringify({ isMinimized: isPanelMinimized }));
+      console.log('Save locations panel state saved to localStorage:', { isMinimized: isPanelMinimized });
     } catch (e) {
       if (__DEV__) {
         console.error('Error saving panel state:', e);
@@ -1860,30 +1899,35 @@ const createSaveLocationsPanel = () => {
 
     if (isPanelMinimized) {
       // Minimize panel - keep same width as Control panel when minimized
+      console.log('Minimizing save locations panel');
       saveLocationsPanelElement!.style.minWidth = '40px';
       saveLocationsPanelElement!.style.width = '40px';
       saveLocationsPanelElement!.style.maxWidth = '40px';
       saveLocationsPanelElement!.style.padding = '8px';
       header.style.marginBottom = '0';
       title.textContent = 'L'; // Show only first letter
-      toggleButton.style.display = ''; // Keep toggle button visible
       toggleButton.textContent = '+'; // Maximize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Hide content elements container
       const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
       if (contentContainer) {
         (contentContainer as HTMLElement).style.display = 'none';
       }
+      console.log('Finished minimizing save locations panel');
     } else {
       // Maximize panel
+      console.log('Maximizing save locations panel');
       saveLocationsPanelElement!.style.minWidth = '200px';
       saveLocationsPanelElement!.style.width = '200px';
       saveLocationsPanelElement!.style.maxWidth = '200px';
       saveLocationsPanelElement!.style.padding = '12px';
       header.style.marginBottom = '8px';
       title.textContent = 'Location'; // Restore full title
-      toggleButton.style.display = ''; // Show toggle button
       toggleButton.textContent = '−'; // Minimize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Show content elements container
       const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
@@ -1916,6 +1960,7 @@ const createSaveLocationsPanel = () => {
 
       // Refresh the saved locations list
       refreshSavedLocationsList();
+      console.log('Finished maximizing save locations panel');
     }
   });
 
@@ -1924,7 +1969,7 @@ const createSaveLocationsPanel = () => {
     // Don't expand panel when clicking on 'C' or 'L' in minimized state
     // Only the toggle button (+/-) should control expansion
     if (isPanelMinimized) {
-      console.log('Control panel title clicked in minimized state, ignoring');
+      console.log('Save locations panel title clicked in minimized state, ignoring');
       // Do nothing - let the user click the toggle button to expand
     }
   });
@@ -2109,6 +2154,7 @@ const createSaveLocationsPanel = () => {
 
   // Add panel to document
   document.body.appendChild(saveLocationsPanelElement);
+  console.log('Save locations panel added to document body');
 
   // Load saved locations
   refreshSavedLocationsList();
@@ -2133,6 +2179,7 @@ const createSaveLocationsPanel = () => {
     // Allow dragging from anywhere except buttons
     const target = e.target as HTMLElement;
     if (target.tagName !== 'BUTTON') {
+      console.log('Save locations panel drag start');
       // Get current position directly from the element
       const rect = saveLocationsPanelElement!.getBoundingClientRect();
       locationPanelXOffset = rect.left;
@@ -2149,6 +2196,7 @@ const createSaveLocationsPanel = () => {
 
   function locationPanelDrag(e: MouseEvent) {
     if (isLocationPanelDragging) {
+      console.log('Save locations panel dragging');
       locationPanelCurrentX = e.clientX - locationPanelInitialX;
       locationPanelCurrentY = e.clientY - locationPanelInitialY;
 
@@ -2164,7 +2212,7 @@ const createSaveLocationsPanel = () => {
   }
 
   function locationPanelDragEnd() {
-    console.log('Location panel drag ended, isPanelMinimized:', isPanelMinimized);
+    console.log('Save locations panel drag ended, isPanelMinimized:', isPanelMinimized);
     locationPanelInitialX = locationPanelCurrentX;
     locationPanelInitialY = locationPanelCurrentY;
 
@@ -2172,23 +2220,25 @@ const createSaveLocationsPanel = () => {
     
     // Always ensure panel stays in its current state (minimized or expanded)
     if (isPanelMinimized) {
-      console.log('Location panel was minimized, restoring minimized state');
+      console.log('Save locations panel was minimized, restoring minimized state');
       // Force minimized styles to ensure panel stays minimized
       setTimeout(() => {
         if (isPanelMinimized) { // Double-check the state
+          console.log('Applying minimized styles in drag end for save locations panel');
           saveLocationsPanelElement!.style.minWidth = '40px';
           saveLocationsPanelElement!.style.width = '40px';
           saveLocationsPanelElement!.style.maxWidth = '40px';
           saveLocationsPanelElement!.style.padding = '8px';
           header.style.marginBottom = '0';
-          title.textContent = 'L';
-          toggleButton.textContent = '+';
+          // Don't force set title and toggleButton text here as they might have been updated by user interaction
+          // title.textContent and toggleButton.textContent should already be correct
           
           // Ensure content is hidden
           const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
           if (contentContainer) {
             (contentContainer as HTMLElement).style.display = 'none';
           }
+          console.log('Finished applying minimized styles in drag end for save locations panel');
         }
       }, 0);
     }
@@ -2209,24 +2259,6 @@ const createSaveLocationsPanel = () => {
 
   // Prevent text selection when dragging
   saveLocationsPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
-  
-  // Apply initial state based on isPanelMinimized
-  if (isPanelMinimized) {
-    // Apply minimized styles immediately
-    saveLocationsPanelElement!.style.minWidth = '40px';
-    saveLocationsPanelElement!.style.width = '40px';
-    saveLocationsPanelElement!.style.maxWidth = '40px';
-    saveLocationsPanelElement!.style.padding = '8px';
-    header.style.marginBottom = '0';
-    title.textContent = 'L';
-    toggleButton.textContent = '+';
-    
-    // Hide content elements container
-    const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
-    if (contentContainer) {
-      (contentContainer as HTMLElement).style.display = 'none';
-    }
-  }
 };
 
 // Function to delete a saved location
