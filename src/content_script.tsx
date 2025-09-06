@@ -741,18 +741,15 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.userSelect = 'none'; // Prevent text selection
 
   // State for panel minimized/maximized
+  // When placing overlay, always initialize panel as expanded (not minimized)
   let isPanelMinimized = false;
   
-  // Try to restore panel state from localStorage
+  // Save the initial state to localStorage to ensure consistency
   try {
-    const savedState = localStorage.getItem(CONTROL_PANEL_STATE_KEY);
-    if (savedState) {
-      const state = JSON.parse(savedState);
-      isPanelMinimized = state.isMinimized || false;
-    }
+    localStorage.setItem(CONTROL_PANEL_STATE_KEY, JSON.stringify({ isMinimized: false }));
   } catch (e) {
     if (__DEV__) {
-      console.error('Error parsing control panel state:', e);
+      console.error('Error saving initial control panel state:', e);
     }
   }
 
@@ -1813,18 +1810,15 @@ const createSaveLocationsPanel = () => {
   saveLocationsPanelElement.style.userSelect = 'none';
 
   // State for panel minimized/maximized
+  // When creating the panel, always initialize it as expanded (not minimized)
   let isPanelMinimized = false;
   
-  // Try to restore panel state from localStorage
+  // Save the initial state to localStorage to ensure consistency
   try {
-    const savedState = localStorage.getItem(PANEL_STATE_KEY);
-    if (savedState) {
-      const state = JSON.parse(savedState);
-      isPanelMinimized = state.isMinimized || false;
-    }
+    localStorage.setItem(PANEL_STATE_KEY, JSON.stringify({ isMinimized: false }));
   } catch (e) {
     if (__DEV__) {
-      console.error('Error parsing panel state:', e);
+      console.error('Error saving initial panel state:', e);
     }
   }
 
