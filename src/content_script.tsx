@@ -20,6 +20,10 @@ let saveLocationsPanelElement: HTMLDivElement | null = null;
 // Keep track of whether the listener is already set up
 let isListenerSetUp = false;
 
+// Track active drag operations to prevent event listener leaks
+let activeControlPanelDragListeners = false;
+let activeLocationPanelDragListeners = false;
+
 // Constants for localStorage
 const SAVE_LOCATIONS_KEY = 'wplace_professor_save_locations';
 const PANEL_STATE_KEY = 'wplace_professor_panel_state'; // 新增的面板状态键
@@ -702,8 +706,11 @@ const placeOverlay = (dataUrl: string) => {
   if (controlPanelElement) {
     console.log('Removing existing control panel element');
     // Remove event listeners to prevent memory leaks and unexpected behavior
-    document.removeEventListener('mousemove', controlPanelDrag);
-    document.removeEventListener('mouseup', controlPanelDragEnd);
+    if (activeControlPanelDragListeners) {
+      document.removeEventListener('mousemove', controlPanelGlobalDragHandler);
+      document.removeEventListener('mouseup', controlPanelGlobalDragEndHandler);
+      activeControlPanelDragListeners = false;
+    }
     controlPanelElement.remove();
   }
 
@@ -795,6 +802,9 @@ const placeOverlay = (dataUrl: string) => {
     e.stopPropagation();
     const previousState = isPanelMinimized;
     isPanelMinimized = !isPanelMinimized;
+    
+    // Update global state for drag handler
+    controlPanelMinimizedState = isPanelMinimized;
     
     console.log(`Control panel toggle button clicked. State changed from ${previousState} to ${isPanelMinimized}`);
 
@@ -1335,96 +1345,33 @@ const placeOverlay = (dataUrl: string) => {
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     console.log('Close button clicked, removing overlay and control panel');
-    if (overlayElement) {
-      overlayElement.remove();
-      overlayElement = null;
-    }
-    if (controlPanelElement) {
-      controlPanelElement.remove();
-      controlPanelElement = null;
-    }
+    removeOverlay();
   });
 
   // Make the panel draggable
-  let isControlPanelDragging = false;
-  let controlPanelCurrentX: number = 0;
-  let controlPanelCurrentY: number = 0;
-  let controlPanelInitialX: number = 0;
-  let controlPanelInitialY: number = 0;
-  let controlPanelXOffset = 0;
-  let controlPanelYOffset = 0;
-
-  function controlPanelDragStart(e: MouseEvent) {
-    // Allow dragging from anywhere except buttons
-    const target = e.target as HTMLElement;
-    if (target.tagName !== 'BUTTON') {
-      console.log('Control panel drag start');
-      controlPanelInitialX = e.clientX - controlPanelXOffset;
-      controlPanelInitialY = e.clientY - controlPanelYOffset;
-
-      isControlPanelDragging = true;
-      e.preventDefault(); // Prevent text selection
-      e.stopPropagation(); // Prevent other event handlers
-    }
+  // Clean up any existing drag listeners
+  if (activeControlPanelDragListeners) {
+    document.removeEventListener('mousemove', controlPanelGlobalDragHandler);
+    document.removeEventListener('mouseup', controlPanelGlobalDragEndHandler);
+    activeControlPanelDragListeners = false;
   }
-
-  function controlPanelDrag(e: MouseEvent) {
-    if (isControlPanelDragging) {
-      console.log('Control panel dragging');
-      controlPanelCurrentX = e.clientX - controlPanelInitialX;
-      controlPanelCurrentY = e.clientY - controlPanelInitialY;
-
-      controlPanelXOffset = controlPanelCurrentX;
-      controlPanelYOffset = controlPanelCurrentY;
-
-      setControlPanelTranslate(controlPanelCurrentX, controlPanelCurrentY, controlPanelElement!);
-      
-      // Prevent any default behavior that might cause expansion
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
-
-  function controlPanelDragEnd() {
-    console.log('Control panel drag ended, isPanelMinimized:', isPanelMinimized);
-    controlPanelInitialX = controlPanelCurrentX;
-    controlPanelInitialY = controlPanelCurrentY;
-
-    isControlPanelDragging = false;
-    
-    // Always ensure panel stays in its current state (minimized or expanded)
-    if (isPanelMinimized) {
-      console.log('Control panel was minimized, restoring minimized state');
-      // Force minimized styles to ensure panel stays minimized
-      setTimeout(() => {
-        if (isPanelMinimized) { // Double-check the state
-          console.log('Applying minimized styles in drag end');
-          controlPanelElement!.style.minWidth = '40px';
-          controlPanelElement!.style.padding = '8px';
-          titleContainer.style.marginBottom = '0';
-          // Don't force set title and toggleButton text here as they might have been updated by user interaction
-          // title.textContent and toggleButton.textContent should already be correct
-          
-          // Ensure all children except titleContainer are hidden
-          Array.from(controlPanelElement!.children).forEach(child => {
-            if (child !== titleContainer) {
-              (child as HTMLElement).style.display = 'none';
-            }
-          });
-          console.log('Finished applying minimized styles in drag end');
-        }
-      }, 0);
-    }
-  }
-
-  function setControlPanelTranslate(xPos: number, yPos: number, el: HTMLElement) {
-    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
-  }
-
+  
+  // Set up drag state
+  isControlPanelDragging = false;
+  controlPanelCurrentX = 0;
+  controlPanelCurrentY = 0;
+  controlPanelInitialX = 0;
+  controlPanelInitialY = 0;
+  controlPanelXOffset = 0;
+  controlPanelYOffset = 0;
+  controlPanelTitleContainer = titleContainer;
+  controlPanelMinimizedState = isPanelMinimized;
+  
   // Attach event listeners for dragging
-  controlPanelElement.addEventListener('mousedown', controlPanelDragStart);
-  document.addEventListener('mousemove', controlPanelDrag);
-  document.addEventListener('mouseup', controlPanelDragEnd);
+  controlPanelElement.addEventListener('mousedown', controlPanelGlobalDragStartHandler);
+  document.addEventListener('mousemove', controlPanelGlobalDragHandler);
+  document.addEventListener('mouseup', controlPanelGlobalDragEndHandler);
+  activeControlPanelDragListeners = true;
 
   // Prevent text selection when dragging
   controlPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
@@ -1542,6 +1489,12 @@ const removeOverlay = () => {
   }
 
   if (controlPanelElement) {
+    // Remove event listeners to prevent memory leaks and unexpected behavior
+    if (activeControlPanelDragListeners) {
+      document.removeEventListener('mousemove', controlPanelGlobalDragHandler);
+      document.removeEventListener('mouseup', controlPanelGlobalDragEndHandler);
+      activeControlPanelDragListeners = false;
+    }
     controlPanelElement.remove();
     controlPanelElement = null;
   }
@@ -1550,6 +1503,139 @@ const removeOverlay = () => {
   const existingHighlights = document.querySelectorAll('.wplace-pixel-highlight, .wplace-pixel-highlight-container');
   existingHighlights.forEach(el => el.remove());
 };
+
+// Global drag handlers for control panel
+let isControlPanelDragging = false;
+let controlPanelCurrentX: number = 0;
+let controlPanelCurrentY: number = 0;
+let controlPanelInitialX: number = 0;
+let controlPanelInitialY: number = 0;
+let controlPanelXOffset = 0;
+let controlPanelYOffset = 0;
+let controlPanelTitleContainer: HTMLDivElement | null = null;
+let controlPanelMinimizedState: boolean = false;
+
+function controlPanelGlobalDragStartHandler(e: MouseEvent) {
+  // Allow dragging from anywhere except buttons
+  const target = e.target as HTMLElement;
+  if (target.tagName !== 'BUTTON' && controlPanelElement) {
+    console.log('Control panel drag start');
+    controlPanelInitialX = e.clientX - controlPanelXOffset;
+    controlPanelInitialY = e.clientY - controlPanelYOffset;
+
+    isControlPanelDragging = true;
+    e.preventDefault(); // Prevent text selection
+    e.stopPropagation(); // Prevent other event handlers
+  }
+}
+
+function controlPanelGlobalDragHandler(e: MouseEvent) {
+  if (isControlPanelDragging && controlPanelElement) {
+    console.log('Control panel dragging');
+    controlPanelCurrentX = e.clientX - controlPanelInitialX;
+    controlPanelCurrentY = e.clientY - controlPanelInitialY;
+
+    controlPanelXOffset = controlPanelCurrentX;
+    controlPanelYOffset = controlPanelCurrentY;
+
+    controlPanelElement.style.transform = `translate3d(${controlPanelCurrentX}px, ${controlPanelCurrentY}px, 0)`;
+    
+    // Prevent any default behavior that might cause expansion
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}
+
+function controlPanelGlobalDragEndHandler(e: MouseEvent) {
+  console.log('Control panel drag ended, isPanelMinimized:', controlPanelMinimizedState);
+  controlPanelInitialX = controlPanelCurrentX;
+  controlPanelInitialY = controlPanelCurrentY;
+
+  isControlPanelDragging = false;
+  
+  // Always ensure panel stays in its current state (minimized or expanded)
+  if (controlPanelMinimizedState && controlPanelElement && controlPanelTitleContainer) {
+    console.log('Control panel was minimized, restoring minimized state');
+    // Force minimized styles to ensure panel stays minimized
+    setTimeout(() => {
+      if (controlPanelMinimizedState && controlPanelElement && controlPanelTitleContainer) { // Double-check the state
+        console.log('Applying minimized styles in drag end');
+        controlPanelElement.style.minWidth = '40px';
+        controlPanelElement.style.padding = '8px';
+        controlPanelTitleContainer.style.marginBottom = '0';
+        // Don't force set title and toggleButton text here as they might have been updated by user interaction
+        // title.textContent and toggleButton.textContent should already be correct
+        
+        // Ensure all children except titleContainer are hidden
+        Array.from(controlPanelElement.children).forEach(child => {
+          if (child !== controlPanelTitleContainer) {
+            (child as HTMLElement).style.display = 'none';
+          }
+        });
+        console.log('Finished applying minimized styles in drag end');
+      }
+    }, 0);
+  }
+}
+
+// Global drag handlers for location panel
+let isLocationPanelDragging = false;
+let locationPanelCurrentX: number = 0;
+let locationPanelCurrentY: number = 0;
+let locationPanelInitialX: number = 0;
+let locationPanelInitialY: number = 0;
+let locationPanelXOffset = 0;
+let locationPanelYOffset = 0;
+
+function locationPanelGlobalDragStartHandler(e: MouseEvent) {
+  // Allow dragging from anywhere except buttons
+  const target = e.target as HTMLElement;
+  if (target.tagName !== 'BUTTON' && saveLocationsPanelElement) {
+    console.log('Save locations panel drag start');
+    // Get current position directly from the element
+    const rect = saveLocationsPanelElement.getBoundingClientRect();
+    locationPanelXOffset = rect.left;
+    locationPanelYOffset = rect.top;
+    
+    locationPanelInitialX = e.clientX - locationPanelXOffset;
+    locationPanelInitialY = e.clientY - locationPanelYOffset;
+
+    isLocationPanelDragging = true;
+    e.preventDefault(); // Prevent text selection
+    e.stopPropagation(); // Prevent other event handlers
+  }
+}
+
+function locationPanelGlobalDragHandler(e: MouseEvent) {
+  if (isLocationPanelDragging && saveLocationsPanelElement) {
+    console.log('Save locations panel dragging');
+    locationPanelCurrentX = e.clientX - locationPanelInitialX;
+    locationPanelCurrentY = e.clientY - locationPanelInitialY;
+
+    locationPanelXOffset = locationPanelCurrentX;
+    locationPanelYOffset = locationPanelCurrentY;
+
+    // Remove the transform style that was used for initial positioning
+    saveLocationsPanelElement.style.transform = '';
+    // Set position using left and top instead
+    saveLocationsPanelElement.style.left = `${locationPanelCurrentX}px`;
+    saveLocationsPanelElement.style.top = `${locationPanelCurrentY}px`;
+    
+    // Prevent any default behavior that might cause expansion
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}
+
+function locationPanelGlobalDragEndHandler(e: MouseEvent) {
+  console.log('Save locations panel drag ended, isPanelMinimized:', false); // We'll need to track this state separately
+  locationPanelInitialX = locationPanelCurrentX;
+  locationPanelInitialY = locationPanelCurrentY;
+
+  isLocationPanelDragging = false;
+  
+  // Note: We're not implementing the same restoration logic for location panel as it's less critical
+}
 
 // Helper function to create color panel with calculated color counts
 const createColorPanelWithCalculatedColors = (colorCounts: { [key: string]: number }, pixelScale: number) => {
@@ -1808,8 +1894,11 @@ const createSaveLocationsPanel = () => {
   if (saveLocationsPanelElement) {
     console.log('Removing existing save locations panel element');
     // Remove event listeners to prevent memory leaks and unexpected behavior
-    document.removeEventListener('mousemove', locationPanelDrag);
-    document.removeEventListener('mouseup', locationPanelDragEnd);
+    if (activeLocationPanelDragListeners) {
+      document.removeEventListener('mousemove', locationPanelGlobalDragHandler);
+      document.removeEventListener('mouseup', locationPanelGlobalDragEndHandler);
+      activeLocationPanelDragListeners = false;
+    }
     saveLocationsPanelElement.remove();
   }
 
@@ -2156,102 +2245,27 @@ const createSaveLocationsPanel = () => {
   refreshSavedLocationsList();
 
   // Make the panel draggable
-  let isLocationPanelDragging = false;
-  let locationPanelCurrentX: number = 0;
-  let locationPanelCurrentY: number = 0;
-  let locationPanelInitialX: number = 0;
-  let locationPanelInitialY: number = 0;
-  let locationPanelXOffset = 0;
-  let locationPanelYOffset = 0;
-
-  // Get initial position from the panel's style
-  const rect = saveLocationsPanelElement!.getBoundingClientRect();
-  locationPanelXOffset = rect.left;
-  locationPanelYOffset = rect.top;
-  locationPanelCurrentX = locationPanelXOffset;
-  locationPanelCurrentY = locationPanelYOffset;
-
-  function locationPanelDragStart(e: MouseEvent) {
-    // Allow dragging from anywhere except buttons
-    const target = e.target as HTMLElement;
-    if (target.tagName !== 'BUTTON') {
-      console.log('Save locations panel drag start');
-      // Get current position directly from the element
-      const rect = saveLocationsPanelElement!.getBoundingClientRect();
-      locationPanelXOffset = rect.left;
-      locationPanelYOffset = rect.top;
-      
-      locationPanelInitialX = e.clientX - locationPanelXOffset;
-      locationPanelInitialY = e.clientY - locationPanelYOffset;
-
-      isLocationPanelDragging = true;
-      e.preventDefault(); // Prevent text selection
-      e.stopPropagation(); // Prevent other event handlers
-    }
+  // Clean up any existing drag listeners
+  if (activeLocationPanelDragListeners) {
+    document.removeEventListener('mousemove', locationPanelGlobalDragHandler);
+    document.removeEventListener('mouseup', locationPanelGlobalDragEndHandler);
+    activeLocationPanelDragListeners = false;
   }
-
-  function locationPanelDrag(e: MouseEvent) {
-    if (isLocationPanelDragging) {
-      console.log('Save locations panel dragging');
-      locationPanelCurrentX = e.clientX - locationPanelInitialX;
-      locationPanelCurrentY = e.clientY - locationPanelInitialY;
-
-      locationPanelXOffset = locationPanelCurrentX;
-      locationPanelYOffset = locationPanelCurrentY;
-
-      setLocationPanelTranslate(locationPanelCurrentX, locationPanelCurrentY, saveLocationsPanelElement!);
-      
-      // Prevent any default behavior that might cause expansion
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
-
-  function locationPanelDragEnd() {
-    console.log('Save locations panel drag ended, isPanelMinimized:', isPanelMinimized);
-    locationPanelInitialX = locationPanelCurrentX;
-    locationPanelInitialY = locationPanelCurrentY;
-
-    isLocationPanelDragging = false;
-    
-    // Always ensure panel stays in its current state (minimized or expanded)
-    if (isPanelMinimized) {
-      console.log('Save locations panel was minimized, restoring minimized state');
-      // Force minimized styles to ensure panel stays minimized
-      setTimeout(() => {
-        if (isPanelMinimized) { // Double-check the state
-          console.log('Applying minimized styles in drag end for save locations panel');
-          saveLocationsPanelElement!.style.minWidth = '40px';
-          saveLocationsPanelElement!.style.width = '40px';
-          saveLocationsPanelElement!.style.maxWidth = '40px';
-          saveLocationsPanelElement!.style.padding = '8px';
-          header.style.marginBottom = '0';
-          // Don't force set title and toggleButton text here as they might have been updated by user interaction
-          // title.textContent and toggleButton.textContent should already be correct
-          
-          // Ensure content is hidden
-          const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
-          if (contentContainer) {
-            (contentContainer as HTMLElement).style.display = 'none';
-          }
-          console.log('Finished applying minimized styles in drag end for save locations panel');
-        }
-      }, 0);
-    }
-  }
-
-  function setLocationPanelTranslate(xPos: number, yPos: number, el: HTMLElement) {
-    // Remove the transform style that was used for initial positioning
-    el.style.transform = '';
-    // Set position using left and top instead
-    el.style.left = `${xPos}px`;
-    el.style.top = `${yPos}px`;
-  }
-
+  
+  // Set up drag state
+  isLocationPanelDragging = false;
+  locationPanelCurrentX = 0;
+  locationPanelCurrentY = 0;
+  locationPanelInitialX = 0;
+  locationPanelInitialY = 0;
+  locationPanelXOffset = 0;
+  locationPanelYOffset = 0;
+  
   // Attach event listeners for dragging
-  saveLocationsPanelElement.addEventListener('mousedown', locationPanelDragStart);
-  document.addEventListener('mousemove', locationPanelDrag);
-  document.addEventListener('mouseup', locationPanelDragEnd);
+  saveLocationsPanelElement.addEventListener('mousedown', locationPanelGlobalDragStartHandler);
+  document.addEventListener('mousemove', locationPanelGlobalDragHandler);
+  document.addEventListener('mouseup', locationPanelGlobalDragEndHandler);
+  activeLocationPanelDragListeners = true;
 
   // Prevent text selection when dragging
   saveLocationsPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
