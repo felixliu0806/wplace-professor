@@ -1807,6 +1807,9 @@ const createSaveLocationsPanel = () => {
   // Remove existing save locations panel if any
   if (saveLocationsPanelElement) {
     console.log('Removing existing save locations panel element');
+    // Remove event listeners to prevent memory leaks and unexpected behavior
+    document.removeEventListener('mousemove', locationPanelDrag);
+    document.removeEventListener('mouseup', locationPanelDragEnd);
     saveLocationsPanelElement.remove();
   }
 
