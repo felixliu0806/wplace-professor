@@ -1,3 +1,11 @@
+// Extend HTMLDivElement interface to include our custom properties
+interface HTMLDivElement {
+  __saveButton?: HTMLButtonElement;
+  __downloadButton?: HTMLButtonElement;
+  __socialButtonsContainer?: HTMLDivElement;
+  __listContainer?: HTMLDivElement;
+}
+
 // State for the overlay and color panel
 let overlayElement: HTMLDivElement | null = null;
 let controlPanelElement: HTMLDivElement | null = null;
@@ -1284,10 +1292,10 @@ const placeOverlay = (dataUrl: string) => {
 
   // Make the overlay draggable
   let isDragging = false;
-  let currentX: number;
-  let currentY: number;
-  let initialX: number;
-  let initialY: number;
+  let currentX: number = 0;
+  let currentY: number = 0;
+  let initialX: number = 0;
+  let initialY: number = 0;
   let xOffset = 0;
   let yOffset = 0;
 
@@ -1738,10 +1746,13 @@ const createSaveLocationsPanel = () => {
   saveLocationsPanelElement.style.borderRadius = '6px';
   saveLocationsPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   saveLocationsPanelElement.style.fontFamily = 'Arial, sans-serif';
-  saveLocationsPanelElement.style.minWidth = '200px';
+  saveLocationsPanelElement.style.minWidth = '200px'; // Increased from 180px
+  saveLocationsPanelElement.style.width = 'fit-content'; // Use fit-content to allow shrinking
+  saveLocationsPanelElement.style.maxWidth = '200px'; // Increased from 180px
   saveLocationsPanelElement.style.fontSize = '14px';
   saveLocationsPanelElement.style.display = 'flex';
   saveLocationsPanelElement.style.flexDirection = 'column';
+  saveLocationsPanelElement.style.boxSizing = 'border-box'; // Include padding and border in width calculations
 
   // State for panel minimized/maximized
   let isPanelMinimized = false;
@@ -1754,7 +1765,7 @@ const createSaveLocationsPanel = () => {
   header.style.marginBottom = '8px';
 
   const title = document.createElement('h3');
-  title.textContent = 'Saved Locations';
+  title.textContent = 'Locations'; // Changed from 'Saved Locations'
   title.style.margin = '0';
   title.style.fontSize = '16px';
   title.style.fontWeight = 'bold';
@@ -1778,30 +1789,71 @@ const createSaveLocationsPanel = () => {
     if (isPanelMinimized) {
       // Minimize panel
       saveLocationsPanelElement!.style.minWidth = '40px';
+      saveLocationsPanelElement!.style.width = '40px'; // Force width to 40px
+      saveLocationsPanelElement!.style.maxWidth = '40px'; // Force max-width to 40px
       saveLocationsPanelElement!.style.padding = '8px';
       header.style.marginBottom = '0';
       toggleButton.textContent = '+'; // Maximize symbol
 
-      // Hide all children except header
-      Array.from(saveLocationsPanelElement!.children).forEach(child => {
-        if (child !== header) {
-          (child as HTMLElement).style.display = 'none';
+      // Hide content elements container
+      const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+      if (contentContainer) {
+        (contentContainer as HTMLElement).style.display = 'none';
+      }
+      
+      // Debug: Log panel width after minimizing
+      setTimeout(() => {
+        if (__DEV__) {
+          console.log('Panel minimized width:', saveLocationsPanelElement!.offsetWidth);
         }
-      });
+      }, 0);
     } else {
-      // Maximize panel
-      saveLocationsPanelElement!.style.minWidth = '200px';
+      // Maximize panel - use a reasonable width for content display
+      saveLocationsPanelElement!.style.minWidth = '200px'; // Increased from 180px
+      saveLocationsPanelElement!.style.width = 'fit-content'; // Reset width to fit content
+      saveLocationsPanelElement!.style.maxWidth = '200px'; // Increased from 180px
       saveLocationsPanelElement!.style.padding = '12px';
       header.style.marginBottom = '8px';
       toggleButton.textContent = '−'; // Minimize symbol
 
-      // Show all children
-      Array.from(saveLocationsPanelElement!.children).forEach(child => {
-        (child as HTMLElement).style.display = '';
-      });
+      // Show content elements container
+      const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+      if (contentContainer) {
+        (contentContainer as HTMLElement).style.display = '';
+        // Ensure social buttons container is grid
+        const socialButtonsContainer = contentContainer.querySelector('.social-buttons-container');
+        if (socialButtonsContainer) {
+          (socialButtonsContainer as HTMLElement).style.display = 'grid';
+          // Reset font sizes that might have been changed when minimized
+          const socialButtons = socialButtonsContainer.querySelectorAll('button');
+          socialButtons.forEach(button => {
+            (button as HTMLElement).style.fontSize = '13px'; // Increased from 12px
+            (button as HTMLElement).style.padding = '6px'; // Increased from 4px
+          });
+        }
+        
+        // Reset font sizes for save and download buttons
+        const saveBtn = contentContainer.querySelector('button');
+        const downloadBtn = saveBtn?.nextElementSibling as HTMLButtonElement | null;
+        if (saveBtn) {
+          saveBtn.style.fontSize = '13px';
+          saveBtn.style.padding = '6px 10px';
+        }
+        if (downloadBtn) {
+          downloadBtn.style.fontSize = '13px';
+          downloadBtn.style.padding = '6px 10px';
+        }
+      }
 
       // Refresh the saved locations list
       refreshSavedLocationsList();
+      
+      // Debug: Log panel width after maximizing
+      setTimeout(() => {
+        if (__DEV__) {
+          console.log('Panel maximized width:', saveLocationsPanelElement!.offsetWidth);
+        }
+      }, 0);
     }
   });
 
@@ -1811,58 +1863,142 @@ const createSaveLocationsPanel = () => {
 
   // Create save current location button
   const saveButton = document.createElement('button');
-  saveButton.textContent = 'Save Current Location';
+  saveButton.textContent = 'Save Location'; // Changed from 'Save Current Location'
   saveButton.style.background = '#4CAF50';
   saveButton.style.color = 'white';
   saveButton.style.border = 'none';
   saveButton.style.borderRadius = '3px';
-  saveLocationsPanelElement.appendChild(saveButton);
+  saveButton.style.width = '100%';
+  // saveButton.style.flex = '1'; // Remove flex grow
+  // saveButton.style.marginRight = '4px'; // Remove margin
 
-  // Create download button
-  const downloadButton = document.createElement('button');
-  downloadButton.textContent = 'Download Current Page';
-  downloadButton.style.background = '#2196F3';
-  downloadButton.style.color = 'white';
-  downloadButton.style.border = 'none';
-  downloadButton.style.borderRadius = '3px';
-  downloadButton.style.marginTop = '8px';
-  saveLocationsPanelElement.appendChild(downloadButton);
-
+  // Create share card
+  const shareCard = document.createElement('div');
+  shareCard.style.marginTop = '8px';
+  shareCard.style.border = '1px solid #ddd';
+  shareCard.style.borderRadius = '4px';
+  shareCard.style.backgroundColor = 'rgba(245, 245, 245, 0.9)';
+  
+  // Create share card title
+  const shareCardTitle = document.createElement('h4');
+  shareCardTitle.textContent = 'Share';
+  shareCardTitle.style.margin = '0';
+  shareCardTitle.style.padding = '8px';
+  shareCardTitle.style.fontSize = '14px';
+  shareCardTitle.style.fontWeight = 'bold';
+  shareCardTitle.style.color = '#333';
+  shareCardTitle.style.borderBottom = '1px solid #ddd';
+  
   // Create social media sharing buttons container
   const socialButtonsContainer = document.createElement('div');
-  socialButtonsContainer.style.marginTop = '8px';
+  socialButtonsContainer.className = 'social-buttons-container'; // Add class for querying
   socialButtonsContainer.style.display = 'grid';
-  socialButtonsContainer.style.gridTemplateColumns = '1fr 1fr';
+  socialButtonsContainer.style.gridTemplateColumns = '1fr 1fr 1fr 1fr'; // 4 columns for icons
   socialButtonsContainer.style.gap = '4px';
+  socialButtonsContainer.style.padding = '8px';
 
+  // Add title and buttons container to the card
+  shareCard.appendChild(shareCardTitle);
+  shareCard.appendChild(socialButtonsContainer);
+
+  // Social media icons data (simplified paths for demonstration)
+  // In a real implementation, you would use actual SVG paths from Lucide Icons
+  // Social media icons data from Simple Icons (react-icons/si)
   const socialPlatforms = [
-    { name: 'Twitter', color: '#1DA1F2' },
-    { name: 'Facebook', color: '#4267B2' },
-    { name: 'Reddit', color: '#FF4500' },
-    { name: 'LinkedIn', color: '#0077B5' },
-    { name: 'Pinterest', color: '#E60023' },
-    { name: 'Tumblr', color: '#35465C' },
-    { name: 'WhatsApp', color: '#25D366' },
-    { name: 'Telegram', color: '#0088cc' }
+    { 
+      name: 'Twitter', 
+      label: 'Twitter', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+      </svg>`, 
+      color: '#1DA1F2' 
+    },
+    { 
+      name: 'Facebook', 
+      label: 'Facebook', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>`, 
+      color: '#1877F2' 
+    },
+    { 
+      name: 'Reddit', 
+      label: 'Reddit', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+      </svg>`, 
+      color: '#FF4500' 
+    },
+    { 
+      name: 'LinkedIn', 
+      label: 'LinkedIn', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+      </svg>`, 
+      color: '#0A66C2' 
+    },
+    { 
+      name: 'Pinterest', 
+      label: 'Pinterest', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.402.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.357-.629-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24.009 12.017 24.009c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641.001 12.017.001z"/>
+      </svg>`, 
+      color: '#BD081C' 
+    },
+    { 
+      name: 'Tumblr', 
+      label: 'Tumblr', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M14.547 17.334q-1.297 0-1.941-.961-.531-.811-.531-2.195V9.451h3.844V6.385H9.703q.021-.729.063-1.271.083-1.083.292-1.906.208-.823.583-1.489.375-.667.927-1.146.552-.479 1.302-.729.75-.25 1.708-.25.958 0 1.729.26.771.261 1.323.771.552.51.875 1.281.323.771.417 1.844l1.719-.552q-.209-1.219-.854-2.083-.646-.865-1.636-1.344-.99-.479-2.208-.479-1.156 0-2.094.333-.937.334-1.614.948-.677.615-1.073 1.511-.396.896-.531 2.031-.063.521-.094 1.094-.031.573-.042 1.219H7.27V12.5h2.25v4.625q0 1.625.51 2.823.511 1.198 1.438 1.989.927.792 2.26 1.198 1.333.406 3.031.406 1.698 0 2.959-.344 1.26-.344 2.135-.989.875-.646 1.396-1.573.521-.927.719-2.083.198-1.157.198-2.542v-7.25h-3.219v1.031q-.625-.937-1.641-1.416-1.016-.48-2.291-.48z"/>
+      </svg>`, 
+      color: '#36465D' 
+    },
+    { 
+      name: 'WhatsApp', 
+      label: 'WhatsApp', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>`, 
+      color: '#25D366' 
+    },
+    { 
+      name: 'Telegram', 
+      label: 'Telegram', 
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.14.141-.259.259-.374.261l.213-3.053 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.136-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+      </svg>`, 
+      color: '#0088CC' 
+    }
   ];
 
   socialPlatforms.forEach(platform => {
     const button = document.createElement('button');
-    button.textContent = platform.name;
+    button.title = platform.label; // Show full name on hover
     button.style.background = platform.color;
     button.style.color = 'white';
     button.style.border = 'none';
     button.style.borderRadius = '3px';
-    button.style.padding = '4px';
+    button.style.padding = '6px'; // Reduced padding for icons
     button.style.cursor = 'pointer';
-    button.style.fontSize = '12px';
+    button.style.fontSize = '13px'; // Kept font size
+    button.style.width = '100%';
+    button.style.aspectRatio = '1'; // Make buttons square
+    button.style.display = 'flex';
+    button.style.alignItems = 'center';
+    button.style.justifyContent = 'center';
+    
+    // Create SVG icon
+    const iconContainer = document.createElement('div');
+    iconContainer.innerHTML = platform.icon;
+    button.appendChild(iconContainer);
+    
     button.addEventListener('click', () => {
       shareToSocialMedia(platform.name);
     });
     socialButtonsContainer.appendChild(button);
   });
 
-  saveLocationsPanelElement.appendChild(socialButtonsContainer);
+  // saveLocationsPanelElement.appendChild(socialButtonsContainer);
 
   // Create saved locations list container
   const listContainer = document.createElement('div');
@@ -1870,7 +2006,37 @@ const createSaveLocationsPanel = () => {
   listContainer.style.marginTop = '8px';
   listContainer.style.maxHeight = '200px';
   listContainer.style.overflowY = 'auto';
-  saveLocationsPanelElement.appendChild(listContainer);
+  // saveLocationsPanelElement.appendChild(listContainer);
+
+  // Create a container for all content elements
+  const contentContainer = document.createElement('div');
+  contentContainer.className = 'save-locations-content-container'; // Add class for querying
+  contentContainer.appendChild(saveButton); // Add save button
+  // contentContainer.appendChild(shareButton); // Remove share button
+  contentContainer.appendChild(shareCard); // Add share card
+  contentContainer.appendChild(listContainer);
+  
+  // Create delete all locations button
+  const deleteAllButton = document.createElement('button');
+  deleteAllButton.textContent = 'Delete All Locations';
+  deleteAllButton.style.background = '#f44336';
+  deleteAllButton.style.color = 'white';
+  deleteAllButton.style.border = 'none';
+  deleteAllButton.style.borderRadius = '3px';
+  deleteAllButton.style.width = '100%';
+  deleteAllButton.style.marginTop = '8px';
+  deleteAllButton.style.padding = '6px 10px';
+  deleteAllButton.style.cursor = 'pointer';
+  deleteAllButton.style.fontSize = '13px';
+  
+  deleteAllButton.addEventListener('click', () => {
+    // Use custom modal instead of alert
+    showDeleteAllLocationsModal();
+  });
+  
+  contentContainer.appendChild(deleteAllButton);
+  
+  saveLocationsPanelElement.appendChild(contentContainer);
 
   // Add event listeners
   saveButton.addEventListener('click', saveCurrentLocation);
@@ -1882,59 +2048,10 @@ const createSaveLocationsPanel = () => {
   // Load saved locations
   refreshSavedLocationsList();
 
-  // Make the panel draggable
-  makePanelDraggable(saveLocationsPanelElement);
+  // // Make the panel draggable
+  // makePanelDraggable(saveLocationsPanelElement);
 };
 
-// Function to make panel draggable
-const makePanelDraggable = (panel: HTMLDivElement) => {
-  let isDragging = false;
-  let currentX: number;
-  let currentY: number;
-  let initialX: number;
-  let initialY: number;
-  let xOffset = 0;
-  let yOffset = 0;
-
-  panel.addEventListener('mousedown', dragStart);
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('mouseup', dragEnd);
-
-  function dragStart(e: MouseEvent) {
-    // Only drag when clicking on the header
-    if (e.target === panel.firstChild) {
-      initialX = e.clientX - xOffset;
-      initialY = e.clientY - yOffset;
-
-      isDragging = true;
-    }
-  }
-
-  function drag(e: MouseEvent) {
-    if (isDragging) {
-      e.preventDefault();
-
-      currentX = e.clientX - initialX;
-      currentY = e.clientY - initialY;
-
-      xOffset = currentX;
-      yOffset = currentY;
-
-      setTranslate(currentX, currentY, panel);
-    }
-  }
-
-  function dragEnd() {
-    initialX = currentX;
-    initialY = currentY;
-
-    isDragging = false;
-  }
-
-  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
-    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
-  }
-};
 // Function to delete a saved location
 const deleteSavedLocation = (id: string) => {
   const savedLocations = getSavedLocations();
@@ -2150,20 +2267,552 @@ const saveCurrentLocation = async () => {
   if (!urlInput) {
     alert('Could not find URL input. Please try again.'); return;
   }
-  const url = urlInput.value;  // Find and click the copy button
+  const url = urlInput.value;
+  
+  // Wait for the screenshot image to load before closing the modal
+  const screenshotImg = document.querySelector('dialog.modal img[alt="Screenshot"]') as HTMLImageElement;
+  if (screenshotImg && !screenshotImg.complete) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        screenshotImg.addEventListener('load', () => resolve(), { once: true });
+        screenshotImg.addEventListener('error', () => reject(), { once: true });
+        // Add a timeout to avoid waiting indefinitely
+        setTimeout(() => reject(), 5000);
+      });
+      console.log('Screenshot image loaded successfully');
+    } catch (error) {
+      console.log('Screenshot image failed to load or timeout reached');
+    }
+  }
+  
+  // Prompt user for a name using a custom modal instead of alert
+  console.log('About to show location name modal, shareButton:', shareButton);
+  showLocationNameModal(url, shareButton);
+};
 
-  // Prompt user for a name
-  let locationName = prompt(`Enter a name for this location (max ${MAX_NAME_LENGTH} characters):`,
-    new Date().toISOString().replace(/T.*/, '').replace(/-/g, ''));
+// Function to show a custom modal for entering location name
+const showLocationNameModal = (url: string, shareButton: Element | null) => {
+  console.log('showLocationNameModal called with shareButton:', shareButton);
+  
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.id = 'wplace-location-name-modal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '100000';
+  modal.style.userSelect = 'none'; // Prevent text selection on the backdrop
 
-  // If user cancels, return
-  if (locationName === null) return;
+  // Create modal content - similar to control panel style
+  const modalContent = document.createElement('div');
+  modalContent.id = 'wplace-location-name-modal-content';
+  modalContent.style.position = 'fixed';
+  modalContent.style.top = '50%';
+  modalContent.style.left = '50%';
+  modalContent.style.transform = 'translate(-50%, -50%)';
+  modalContent.style.zIndex = '100001';
+  modalContent.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  modalContent.style.padding = '12px';
+  modalContent.style.borderRadius = '6px';
+  modalContent.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  modalContent.style.fontFamily = 'Arial, sans-serif';
+  modalContent.style.minWidth = '200px';
+  modalContent.style.fontSize = '14px';
 
-  // If no name provided, use timestamp
-  if (!locationName.trim()) {
-    locationName = new Date().toISOString().replace(/T.*/, '').replace(/-/g, '');
+  // Create title container with drag handle
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.cursor = 'move'; // Show that this area is draggable
+
+  // Create title
+  const title = document.createElement('h3');
+  title.textContent = 'Save Location';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  title.style.flex = '1';
+  title.style.cursor = 'move'; // Also draggable
+
+  titleContainer.appendChild(title);
+
+  // Create input label
+  const label = document.createElement('div');
+  label.textContent = 'Enter a name for this location:';
+  label.style.fontSize = '13px';
+  label.style.marginBottom = '4px';
+  label.style.color = '#555';
+
+  // Create input field
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = MAX_NAME_LENGTH;
+  input.placeholder = `Max ${MAX_NAME_LENGTH} characters`;
+  input.style.width = '100%';
+  input.style.padding = '6px';
+  input.style.border = '1px solid #ccc';
+  input.style.borderRadius = '3px';
+  input.style.fontSize = '13px';
+  input.style.marginBottom = '8px';
+  input.style.boxSizing = 'border-box';
+
+  // Set default value to current date
+  const defaultValue = new Date().toISOString().replace(/T.*/, '').replace(/-/g, '');
+  input.value = defaultValue;
+
+  // Create buttons container
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.justifyContent = 'flex-end';
+  buttonsContainer.style.gap = '6px';
+
+  // Create save button
+  const saveButton = document.createElement('button');
+  saveButton.textContent = 'Save';
+  saveButton.style.background = '#4CAF50';
+  saveButton.style.color = 'white';
+  saveButton.style.border = 'none';
+  saveButton.style.borderRadius = '3px';
+  saveButton.style.padding = '6px 10px';
+  saveButton.style.cursor = 'pointer';
+  saveButton.style.fontSize = '13px';
+
+  // Create cancel button
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.background = '#f44336';
+  cancelButton.style.color = 'white';
+  cancelButton.style.border = 'none';
+  cancelButton.style.borderRadius = '3px';
+  cancelButton.style.padding = '6px 10px';
+  cancelButton.style.cursor = 'pointer';
+  cancelButton.style.fontSize = '13px';
+
+  // Add event listeners
+  saveButton.addEventListener('click', () => {
+    const locationName = input.value.trim();
+    if (locationName) {
+      saveLocationWithName(url, locationName);
+    }
+    // Close the custom modal
+    document.body.removeChild(modal);
+    
+    // Click the share button again to close the modal after 2 seconds
+    if (shareButton) {
+      console.log('Scheduling share button click in 2 seconds to close the modal. shareButton:', shareButton);
+      setTimeout(() => {
+        console.log('Clicking share button to close the modal. shareButton:', shareButton);
+        console.log('shareButton tagName:', (shareButton as HTMLElement).tagName);
+        console.log('shareButton textContent:', (shareButton as HTMLElement).textContent);
+        (shareButton as HTMLElement).click();
+      }, 2000);
+    } else {
+      console.log('shareButton is null, cannot click to close modal');
+    }
+  });
+
+  cancelButton.addEventListener('click', () => {
+    // Click the share button again to close the modal
+    if (shareButton) {
+      console.log('Clicking share button to close the modal immediately (cancel). shareButton:', shareButton);
+      (shareButton as HTMLElement).click();
+    } else {
+      console.log('shareButton is null, cannot click to close modal (cancel)');
+    }
+    document.body.removeChild(modal);
+  });
+
+  // Allow saving with Enter key
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const locationName = input.value.trim();
+      if (locationName) {
+        saveLocationWithName(url, locationName);
+      }
+      // Click the share button again to close the modal
+      if (shareButton) {
+        setTimeout(() => {
+          (shareButton as HTMLElement).click();
+        }, 2000);
+      }
+      document.body.removeChild(modal);
+    }
+  });
+
+  // Allow closing with Escape key
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // Click the share button again to close the modal after 2 seconds
+      if (shareButton) {
+        console.log('Scheduling share button click in 2 seconds to close the modal (ESC key). shareButton:', shareButton);
+        setTimeout(() => {
+          console.log('Clicking share button to close the modal (ESC key). shareButton:', shareButton);
+          console.log('shareButton tagName:', (shareButton as HTMLElement).tagName);
+          console.log('shareButton textContent:', (shareButton as HTMLElement).textContent);
+          (shareButton as HTMLElement).click();
+        }, 2000);
+      } else {
+        console.log('shareButton is null, cannot click to close modal (ESC key)');
+      }
+      document.body.removeChild(modal);
+    }
+  });
+
+  // Make the modal draggable like the control panel
+  let isDragging = false;
+  let currentX: number = 0;
+  let currentY: number = 0;
+  let initialX: number = 0;
+  let initialY: number = 0;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  function dragStart(e: MouseEvent) {
+    // Only drag when clicking on the title container or title
+    if (e.target === titleContainer || e.target === title) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      isDragging = true;
+      e.preventDefault(); // Prevent text selection
+    }
   }
 
+  function drag(e: MouseEvent) {
+    if (isDragging) {
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, modalContent);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+
+    isDragging = false;
+  }
+
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
+  }
+
+  // Attach event listeners for dragging
+  titleContainer.addEventListener('mousedown', dragStart);
+  title.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+
+  // Prevent text selection when dragging
+  titleContainer.addEventListener('selectstart', (e) => e.preventDefault());
+  title.addEventListener('selectstart', (e) => e.preventDefault());
+
+  // Assemble modal
+  modalContent.appendChild(titleContainer);
+  modalContent.appendChild(label);
+  modalContent.appendChild(input);
+  modalContent.appendChild(buttonsContainer);
+  
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(saveButton);
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Focus the input field
+  input.focus();
+};
+
+// Function to show a custom modal for confirming delete all locations
+const showDeleteAllLocationsModal = () => {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.id = 'wplace-delete-all-locations-modal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '100000';
+  modal.style.userSelect = 'none'; // Prevent text selection on the backdrop
+
+  // Create modal content - similar to control panel style
+  const modalContent = document.createElement('div');
+  modalContent.id = 'wplace-delete-all-locations-modal-content';
+  modalContent.style.position = 'fixed';
+  modalContent.style.top = '50%';
+  modalContent.style.left = '50%';
+  modalContent.style.transform = 'translate(-50%, -50%)';
+  modalContent.style.zIndex = '100001';
+  modalContent.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  modalContent.style.padding = '12px';
+  modalContent.style.borderRadius = '6px';
+  modalContent.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  modalContent.style.fontFamily = 'Arial, sans-serif';
+  modalContent.style.minWidth = '200px';
+  modalContent.style.fontSize = '14px';
+
+  // Create title container with drag handle
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.cursor = 'move'; // Show that this area is draggable
+
+  // Create title
+  const title = document.createElement('h3');
+  title.textContent = 'Delete All Locations';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  title.style.flex = '1';
+  title.style.cursor = 'move'; // Also draggable
+
+  titleContainer.appendChild(title);
+
+  // Create message
+  const message = document.createElement('div');
+  message.textContent = 'Are you sure you want to delete all saved locations?';
+  message.style.fontSize = '13px';
+  message.style.marginBottom = '12px';
+  message.style.color = '#555';
+
+  // Create buttons container
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.justifyContent = 'flex-end';
+  buttonsContainer.style.gap = '6px';
+
+  // Create delete button
+  const deleteButton = document.createElement('button');
+  deleteButton.textContent = 'Delete';
+  deleteButton.style.background = '#f44336';
+  deleteButton.style.color = 'white';
+  deleteButton.style.border = 'none';
+  deleteButton.style.borderRadius = '3px';
+  deleteButton.style.padding = '6px 10px';
+  deleteButton.style.cursor = 'pointer';
+  deleteButton.style.fontSize = '13px';
+
+  // Create cancel button
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.background = '#e0e0e0';
+  cancelButton.style.color = '#333';
+  cancelButton.style.border = 'none';
+  cancelButton.style.borderRadius = '3px';
+  cancelButton.style.padding = '6px 10px';
+  cancelButton.style.cursor = 'pointer';
+  cancelButton.style.fontSize = '13px';
+
+  // Add event listeners
+  deleteButton.addEventListener('click', () => {
+    localStorage.removeItem(SAVE_LOCATIONS_KEY);
+    refreshSavedLocationsList();
+    document.body.removeChild(modal);
+  });
+
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  // Allow closing with Escape key
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.body.removeChild(modal);
+    }
+  });
+
+  // Make the modal draggable like the control panel
+  let isDragging = false;
+  let currentX: number = 0;
+  let currentY: number = 0;
+  let initialX: number = 0;
+  let initialY: number = 0;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  function dragStart(e: MouseEvent) {
+    // Only drag when clicking on the title container or title
+    if (e.target === titleContainer || e.target === title) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      isDragging = true;
+      e.preventDefault(); // Prevent text selection
+    }
+  }
+
+  function drag(e: MouseEvent) {
+    if (isDragging) {
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, modalContent);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+
+    isDragging = false;
+  }
+
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
+  }
+
+  // Attach event listeners for dragging
+  titleContainer.addEventListener('mousedown', dragStart);
+  title.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+
+  // Prevent text selection when dragging
+  titleContainer.addEventListener('selectstart', (e) => e.preventDefault());
+  title.addEventListener('selectstart', (e) => e.preventDefault());
+
+  // Assemble modal
+  modalContent.appendChild(titleContainer);
+  modalContent.appendChild(message);
+  modalContent.appendChild(buttonsContainer);
+  
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(deleteButton);
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+};
+
+// Function to share to a specific social media platform
+const shareToSpecificSocialMedia = async (platform: string) => {
+  // Check if share button exists by looking for a button with "Share" text
+  const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
+  let shareButton: Element | null = null;
+
+  // Find the button with "Share" text
+  for (let i = 0; i < shareButtons.length; i++) {
+    const button = shareButtons[i];
+    // Check if the button contains the text "Share"
+    if (button.textContent && button.textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+    // Check if the button has a text node with "Share"
+    const textNodes = Array.from(button.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+    if (textNodes.length > 0 && textNodes[0].textContent && textNodes[0].textContent.trim() === 'Share') {
+      shareButton = button;
+      break;
+    }
+  }
+
+  if (!shareButton) {
+    alert('Please click the page share button first to enable this feature.');
+    return;
+  }
+
+  // Simulate click on share button
+  (shareButton as HTMLElement).click();
+
+  // Wait a bit for the modal to appear and data to render
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Get the URL from the input
+  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
+  if (!urlInput) { alert('Could not find URL input. Please try again.'); return; }
+  const url = urlInput.value;
+  
+  // Wait for the screenshot image to load before closing the modal
+  const screenshotImg = document.querySelector('dialog.modal img[alt="Screenshot"]') as HTMLImageElement;
+  if (screenshotImg && !screenshotImg.complete) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        screenshotImg.addEventListener('load', () => resolve(), { once: true });
+        screenshotImg.addEventListener('error', () => reject(), { once: true });
+        // Add a timeout to avoid waiting indefinitely
+        setTimeout(() => reject(new Error('Timeout')), 5000);
+      });
+      console.log('Screenshot image loaded successfully');
+    } catch (error) {
+      console.log('Screenshot image failed to load or timeout reached');
+    }
+  }
+  
+  // Find and click the copy button
+  const copyButton = document.querySelector('dialog.modal button.btn') as HTMLButtonElement;
+  if (copyButton) {
+    copyButton.click();
+  } else {
+    alert('Could not find copy button. Please try again.');
+    return;
+  }
+
+  // Generate share URL based on platform
+  let shareUrl = '';
+  switch (platform) {
+    case 'Twitter':
+      shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Facebook':
+      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+      break;
+    case 'Reddit':
+      shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
+      break;
+    case 'LinkedIn':
+      shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Pinterest':
+      shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
+      break;
+    case 'Tumblr':
+      shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
+      break;
+    case 'WhatsApp':
+      shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
+      break;
+    case 'Telegram':
+      shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
+      break;
+    default:
+      alert(`Unsupported platform: ${platform}`);
+      return;
+  }
+
+  // Close the share modal by clicking the share button again after a delay
+  setTimeout(() => {
+    (shareButton as HTMLElement).click();
+  }, 1000);
+
+  // Open share URL in new window
+  window.open(shareUrl, '_blank');
+};
+
+// Function to save location with the provided name
+const saveLocationWithName = (url: string, locationName: string) => {
   // Truncate name if too long
   if (locationName.length > MAX_NAME_LENGTH) {
     locationName = locationName.substring(0, MAX_NAME_LENGTH);
@@ -2186,13 +2835,26 @@ const saveCurrentLocation = async () => {
   refreshSavedLocationsList();
 
   // Show success message
-  alert(`Location \"${locationName}\" saved successfully!`);
+  const successMessage = document.createElement('div');
+  successMessage.textContent = `Location "${locationName}" saved successfully!`;
+  successMessage.style.position = 'fixed';
+  successMessage.style.bottom = '20px';
+  successMessage.style.right = '20px';
+  successMessage.style.backgroundColor = '#4CAF50';
+  successMessage.style.color = 'white';
+  successMessage.style.padding = '10px 20px';
+  successMessage.style.borderRadius = '4px';
+  successMessage.style.zIndex = '100001';
+  successMessage.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+  document.body.appendChild(successMessage);
+
+  // Remove success message after 3 seconds
+  setTimeout(() => {
+    if (successMessage.parentNode) {
+      successMessage.parentNode.removeChild(successMessage);
+    }
+  }, 3000);
 };
-
-
-
-
-
 
 // Function to download current page
 const downloadCurrentPage = async () => {
