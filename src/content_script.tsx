@@ -797,7 +797,6 @@ const placeOverlay = (dataUrl: string) => {
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
       title.textContent = 'C'; // Show only first letter
-      toggleButton.style.display = ''; // Keep toggle button visible
       toggleButton.textContent = '+'; // Maximize symbol
 
       // Hide all children except titleContainer
@@ -812,7 +811,6 @@ const placeOverlay = (dataUrl: string) => {
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       title.textContent = 'Control'; // Restore full title
-      toggleButton.style.display = ''; // Show toggle button
       toggleButton.textContent = '−'; // Minimize symbol
 
       // Show all children and restore their original display properties
