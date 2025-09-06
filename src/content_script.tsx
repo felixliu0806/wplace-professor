@@ -793,11 +793,14 @@ const placeOverlay = (dataUrl: string) => {
 
     if (isPanelMinimized) {
       // Minimize panel
+      console.log('Minimizing control panel');
       controlPanelElement!.style.minWidth = '40px';
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
       title.textContent = 'C'; // Show only first letter
       toggleButton.textContent = '+'; // Maximize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Hide all children except titleContainer
       Array.from(controlPanelElement!.children).forEach(child => {
@@ -805,13 +808,17 @@ const placeOverlay = (dataUrl: string) => {
           (child as HTMLElement).style.display = 'none';
         }
       });
+      console.log('Finished minimizing control panel');
     } else {
       // Maximize panel
+      console.log('Maximizing control panel');
       controlPanelElement!.style.minWidth = '180px';
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       title.textContent = 'Control'; // Restore full title
       toggleButton.textContent = '−'; // Minimize symbol
+      console.log('Set title text to:', title.textContent);
+      console.log('Set toggle button text to:', toggleButton.textContent);
 
       // Show all children and restore their original display properties
       opacityLabel.style.display = '';
@@ -832,6 +839,7 @@ const placeOverlay = (dataUrl: string) => {
           colorPanelWrapper.style.display = '';
         }
       }
+      console.log('Finished maximizing control panel');
     }
   });
 
@@ -1379,11 +1387,14 @@ const placeOverlay = (dataUrl: string) => {
       // Force minimized styles to ensure panel stays minimized
       setTimeout(() => {
         if (isPanelMinimized) { // Double-check the state
+          console.log('Applying minimized styles in drag end');
           controlPanelElement!.style.minWidth = '40px';
           controlPanelElement!.style.padding = '8px';
           titleContainer.style.marginBottom = '0';
           title.textContent = 'C';
           toggleButton.textContent = '+';
+          console.log('Set title text to:', title.textContent);
+          console.log('Set toggle button text to:', toggleButton.textContent);
           
           // Ensure all children except titleContainer are hidden
           Array.from(controlPanelElement!.children).forEach(child => {
@@ -1391,6 +1402,7 @@ const placeOverlay = (dataUrl: string) => {
               (child as HTMLElement).style.display = 'none';
             }
           });
+          console.log('Finished applying minimized styles in drag end');
         }
       }, 0);
     }
