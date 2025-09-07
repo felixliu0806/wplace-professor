@@ -2148,7 +2148,10 @@ const createSaveLocationsPanel = () => {
   toggleButton.style.fontWeight = 'bold';
   toggleButton.title = 'Minimize/Maximize panel';
 
+  // Location panel toggle button
+  console.log('Adding click listener to Location panel toggle button');
   toggleButton.addEventListener('click', (e) => {
+    console.log('Save locations panel toggle button clicked');
     e.stopPropagation();
     const previousState = isPanelMinimized;
     isPanelMinimized = !isPanelMinimized;
