@@ -2216,8 +2216,155 @@ const createSaveLocationsPanel = () => {
     iconContainer.innerHTML = platform.icon;
     button.appendChild(iconContainer);
     
-    button.addEventListener('click', () => {
-      shareToSocialMedia(platform.name);
+    button.addEventListener('click', async () => {
+      try {
+        console.log('Social media button clicked:', platform.name);
+        
+        // 查找包含blob URL的<img>元素
+        let imgElement: HTMLImageElement | null = null;
+        const startTime = Date.now();
+        const timeout = 10000; // 10秒超时
+        
+        // 查找分享按钮并点击（如果图片尚未加载）
+        const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
+        let shareButton: Element | null = null;
+        
+        // 查找包含"Share"文本的按钮
+        for (let i = 0; i < shareButtons.length; i++) {
+          const button = shareButtons[i];
+          if (button.textContent && button.textContent.trim() === 'Share') {
+            shareButton = button;
+            break;
+          }
+          const textNodes = Array.from(button.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+          if (textNodes.length > 0 && textNodes[0].textContent && textNodes[0].textContent.trim() === 'Share') {
+            shareButton = button;
+            break;
+          }
+        }
+        
+        // 如果找到分享按钮且图片尚未加载，则点击分享按钮
+        const blobImagesBefore = document.querySelectorAll('img[src^="blob:"]');
+        if (shareButton && blobImagesBefore.length === 0) {
+          console.log('Clicking share button to trigger image generation');
+          (shareButton as HTMLElement).click();
+          
+          // 等待一段时间让图片加载
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // 循环查找blob图片，直到找到元素或超时
+        while (!imgElement && (Date.now() - startTime) < timeout) {
+          // 查找所有可能的blob图片元素
+          const blobImages = document.querySelectorAll('img[src^="blob:"]');
+          if (blobImages.length > 0) {
+            // 选择最后一个图片元素（最新的）
+            imgElement = blobImages[blobImages.length - 1] as HTMLImageElement;
+            console.log('Found blob image element:', imgElement.src);
+            
+            // 检查图片是否已经加载完成
+            if (!imgElement.complete) {
+              console.log('Image not yet loaded, waiting...');
+              // 等待图片加载完成
+              await new Promise<void>((resolve) => {
+                // 设置最大等待时间
+                const loadTimeout = setTimeout(() => {
+                  console.log('Image load timeout, continuing anyway');
+                  resolve();
+                }, 3000);
+                
+                const loadHandler = () => {
+                  clearTimeout(loadTimeout);
+                  imgElement!.removeEventListener('load', loadHandler);
+                  console.log('Image loaded successfully');
+                  resolve();
+                };
+                
+                const errorHandler = () => {
+                  clearTimeout(loadTimeout);
+                  imgElement!.removeEventListener('error', errorHandler);
+                  console.log('Image failed to load');
+                  resolve(); // 即使加载失败也继续，避免无限等待
+                };
+                
+                imgElement!.addEventListener('load', loadHandler);
+                imgElement!.addEventListener('error', errorHandler);
+              });
+            }
+            break;
+          }
+          // 等待100毫秒再试
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (imgElement) {
+          // 使用新的blob图片捕获功能
+          await captureBlobImageToClipboard(imgElement.src);
+          
+          // 显示成功消息
+          showClipboardSuccessModal();
+          
+          // 等待1秒后跳转到社交平台
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // 获取当前页面URL
+          const locationData = localStorage.getItem('location');
+          let url = window.location.href;
+          
+          if (locationData) {
+            try {
+              const locationObj = JSON.parse(locationData);
+              if (locationObj.lat && locationObj.lng && locationObj.zoom) {
+                url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
+              }
+            } catch (e) {
+              console.error('Error parsing location data:', e);
+            }
+          }
+          
+          // 生成社交平台分享URL
+          let shareUrl = '';
+          switch (platform.name) {
+            case 'Twitter':
+              shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
+              break;
+            case 'Facebook':
+              shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+              break;
+            case 'Reddit':
+              shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
+              break;
+            case 'LinkedIn':
+              shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+              break;
+            case 'Pinterest':
+              shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
+              break;
+            case 'Tumblr':
+              shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
+              break;
+            case 'WhatsApp':
+              shareUrl = `https://wa.me/?text=${encodeURIComponent(url)}`;
+              break;
+            case 'Telegram':
+              shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
+              break;
+            default:
+              showCustomAlertModal(`Unsupported platform: ${platform.name}`);
+              return;
+          }
+          
+          // 在新窗口中打开分享URL
+          window.open(shareUrl, '_blank');
+        } else {
+          console.log('No blob image element found after timeout, falling back to original share method');
+          // 如果没有找到blob图片，回退到原来的分享方法
+          shareToSocialMedia(platform.name);
+        }
+      } catch (error) {
+        console.error('Error capturing blob image:', error);
+        showCustomAlertModal('Failed to capture image. Please try again.');
+      }
     });
     socialButtonsContainer.appendChild(button);
   });
@@ -2705,55 +2852,155 @@ const shareToSocialMedia = async (platform: string) => {
   // Construct URL from location data
   const url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
 
-  // Copy map canvas to clipboard
+  // Click the share button silently to get the blob image
   try {
-    await copyMapCanvasToClipboard();
-    
+    // Temporarily hide the modal dialog
+    const dialog = document.querySelector('dialog.modal') as HTMLElement;
+    if (dialog) {
+      dialog.style.opacity = '0';
+      dialog.style.pointerEvents = 'none';
+      dialog.style.visibility = 'hidden';
+    }
+
+    // Create a Promise to capture the blob image from the network request
+    const blobPromise = new Promise<Blob>((resolve, reject) => {
+      // Store the original fetch function
+      const originalFetch = window.fetch;
+      
+      // Override fetch to intercept blob requests
+      window.fetch = function(...args) {
+        return originalFetch.apply(this, args).then(response => {
+          // Check if this is a blob response from wplace.live
+          if (response.url.startsWith('blob:https://wplace.live/')) {
+            // Clone the response to get the blob data
+            response.clone().blob().then(blob => {
+              resolve(blob);
+            }).catch(err => {
+              console.error('Error getting blob from response:', err);
+              reject(err);
+            });
+          }
+          return response;
+        });
+      };
+      
+      // Also override XMLHttpRequest to intercept blob requests
+      const originalXHROpen = XMLHttpRequest.prototype.open;
+      const originalXHRSend = XMLHttpRequest.prototype.send;
+      
+      XMLHttpRequest.prototype.open = function(method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) {
+        // @ts-ignore
+        this._url = url; // Store the URL
+        // @ts-ignore
+        return originalXHROpen.call(this, method, url, async, username, password);
+      };
+      
+      XMLHttpRequest.prototype.send = function(...args) {
+        // @ts-ignore
+        this.addEventListener('load', function() {
+          // @ts-ignore
+          if (this.responseURL && this.responseURL.startsWith('blob:https://wplace.live/')) {
+            try {
+              // @ts-ignore
+              const blob = new Blob([this.response], { type: this.getResponseHeader('Content-Type') });
+              resolve(blob);
+            } catch (err) {
+              console.error('Error creating blob from XHR response:', err);
+              reject(err);
+            }
+          }
+        });
+        // @ts-ignore
+        return originalXHRSend.apply(this, args);
+      };
+      
+      // Set a timeout to reject the promise if no blob is found
+      setTimeout(() => {
+        reject(new Error('Timeout waiting for blob image'));
+      }, 5000);
+    });
+
+    // Click the share button
+    (shareButton as HTMLElement).click();
+
+    // Wait for the blob image from the network request
+    const blob = await blobPromise;
+
+    // Restore the original fetch and XMLHttpRequest functions
+    // Note: We don't actually restore them because they might be needed elsewhere
+    // In a production environment, you might want to be more careful about this
+
+    // Write to clipboard
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+    } else {
+      throw new Error('Clipboard API not supported');
+    }
+
     // Show success message
     showClipboardSuccessModal();
-    
-    // Wait 500ms before opening share URL
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Wait 1 second before opening share URL
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Restore dialog visibility
+    if (dialog) {
+      dialog.style.opacity = '';
+      dialog.style.pointerEvents = '';
+      dialog.style.visibility = '';
+      dialog.removeAttribute('open');
+    }
+
+    // Generate share URL based on platform
+    let shareUrl = '';
+    switch (platform) {
+      case 'Twitter':
+        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        break;
+      case 'Reddit':
+        shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
+        break;
+      case 'LinkedIn':
+        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Pinterest':
+        shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Tumblr':
+        shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
+        break;
+      case 'WhatsApp':
+        shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
+        break;
+      case 'Telegram':
+        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
+        break;
+      default:
+        showCustomAlertModal(`Unsupported platform: ${platform}`);
+        return;
+    }
+
+    // Open share URL in new window
+    window.open(shareUrl, '_blank');
   } catch (error) {
-    console.error('Error copying map to clipboard:', error);
-    showCustomAlertModal('Failed to copy map to clipboard. Please try again.');
-    return;
+    console.error('Error sharing to social media:', error);
+    
+    // Restore dialog visibility in case of error
+    const dialog = document.querySelector('dialog.modal') as HTMLElement;
+    if (dialog) {
+      dialog.style.opacity = '';
+      dialog.style.pointerEvents = '';
+      dialog.style.visibility = '';
+      dialog.removeAttribute('open');
+    }
+    
+    showCustomAlertModal('Failed to share to social media. Please try again.');
   }
-
-  // Generate share URL based on platform
-  let shareUrl = '';
-  switch (platform) {
-    case 'Twitter':
-      shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Facebook':
-      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      break;
-    case 'Reddit':
-      shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
-      break;
-    case 'LinkedIn':
-      shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Pinterest':
-      shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Tumblr':
-      shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
-      break;
-    case 'WhatsApp':
-      shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
-      break;
-    case 'Telegram':
-      shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
-      break;
-    default:
-      showCustomAlertModal(`Unsupported platform: ${platform}`);
-      return;
-  }
-
-  // Open share URL in new window
-  window.open(shareUrl, '_blank');
 };
 
 const getSavedLocations = (): SavedLocation[] => {
@@ -3438,55 +3685,155 @@ const shareToSpecificSocialMedia = async (platform: string) => {
   // Construct URL from location data
   const url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
 
-  // Copy map canvas to clipboard
+  // Click the share button silently to get the blob image
   try {
-    await copyMapCanvasToClipboard();
-    
+    // Temporarily hide the modal dialog
+    const dialog = document.querySelector('dialog.modal') as HTMLElement;
+    if (dialog) {
+      dialog.style.opacity = '0';
+      dialog.style.pointerEvents = 'none';
+      dialog.style.visibility = 'hidden';
+    }
+
+    // Create a Promise to capture the blob image from the network request
+    const blobPromise = new Promise<Blob>((resolve, reject) => {
+      // Store the original fetch function
+      const originalFetch = window.fetch;
+      
+      // Override fetch to intercept blob requests
+      window.fetch = function(...args) {
+        return originalFetch.apply(this, args).then(response => {
+          // Check if this is a blob response from wplace.live
+          if (response.url.startsWith('blob:https://wplace.live/')) {
+            // Clone the response to get the blob data
+            response.clone().blob().then(blob => {
+              resolve(blob);
+            }).catch(err => {
+              console.error('Error getting blob from response:', err);
+              reject(err);
+            });
+          }
+          return response;
+        });
+      };
+      
+      // Also override XMLHttpRequest to intercept blob requests
+      const originalXHROpen = XMLHttpRequest.prototype.open;
+      const originalXHRSend = XMLHttpRequest.prototype.send;
+      
+      XMLHttpRequest.prototype.open = function(method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) {
+        // @ts-ignore
+        this._url = url; // Store the URL
+        // @ts-ignore
+        return originalXHROpen.call(this, method, url, async, username, password);
+      };
+      
+      XMLHttpRequest.prototype.send = function(...args) {
+        // @ts-ignore
+        this.addEventListener('load', function() {
+          // @ts-ignore
+          if (this.responseURL && this.responseURL.startsWith('blob:https://wplace.live/')) {
+            try {
+              // @ts-ignore
+              const blob = new Blob([this.response], { type: this.getResponseHeader('Content-Type') });
+              resolve(blob);
+            } catch (err) {
+              console.error('Error creating blob from XHR response:', err);
+              reject(err);
+            }
+          }
+        });
+        // @ts-ignore
+        return originalXHRSend.apply(this, args);
+      };
+      
+      // Set a timeout to reject the promise if no blob is found
+      setTimeout(() => {
+        reject(new Error('Timeout waiting for blob image'));
+      }, 5000);
+    });
+
+    // Click the share button
+    (shareButton as HTMLElement).click();
+
+    // Wait for the blob image from the network request
+    const blob = await blobPromise;
+
+    // Restore the original fetch and XMLHttpRequest functions
+    // Note: We don't actually restore them because they might be needed elsewhere
+    // In a production environment, you might want to be more careful about this
+
+    // Write to clipboard
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+    } else {
+      throw new Error('Clipboard API not supported');
+    }
+
     // Show success message
     showClipboardSuccessModal();
-    
-    // Wait 500ms before opening share URL
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Wait 1 second before opening share URL
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Restore dialog visibility
+    if (dialog) {
+      dialog.style.opacity = '';
+      dialog.style.pointerEvents = '';
+      dialog.style.visibility = '';
+      dialog.removeAttribute('open');
+    }
+
+    // Generate share URL based on platform
+    let shareUrl = '';
+    switch (platform) {
+      case 'Twitter':
+        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        break;
+      case 'Reddit':
+        shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
+        break;
+      case 'LinkedIn':
+        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Pinterest':
+        shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
+        break;
+      case 'Tumblr':
+        shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
+        break;
+      case 'WhatsApp':
+        shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
+        break;
+      case 'Telegram':
+        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
+        break;
+      default:
+        showCustomAlertModal(`Unsupported platform: ${platform}`);
+        return;
+    }
+
+    // Open share URL in new window
+    window.open(shareUrl, '_blank');
   } catch (error) {
-    console.error('Error copying map to clipboard:', error);
-    showCustomAlertModal('Failed to copy map to clipboard. Please try again.');
-    return;
+    console.error('Error sharing to social media:', error);
+    
+    // Restore dialog visibility in case of error
+    const dialog = document.querySelector('dialog.modal') as HTMLElement;
+    if (dialog) {
+      dialog.style.opacity = '';
+      dialog.style.pointerEvents = '';
+      dialog.style.visibility = '';
+      dialog.removeAttribute('open');
+    }
+    
+    showCustomAlertModal('Failed to share to social media. Please try again.');
   }
-
-  // Generate share URL based on platform
-  let shareUrl = '';
-  switch (platform) {
-    case 'Twitter':
-      shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Facebook':
-      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      break;
-    case 'Reddit':
-      shareUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}`;
-      break;
-    case 'LinkedIn':
-      shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Pinterest':
-      shareUrl = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}`;
-      break;
-    case 'Tumblr':
-      shareUrl = `https://www.tumblr.com/widgets/share/tool?canonicalUrl=${encodeURIComponent(url)}`;
-      break;
-    case 'WhatsApp':
-      shareUrl = `https://wa.me/?${encodeURIComponent(url)}`;
-      break;
-    case 'Telegram':
-      shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
-      break;
-    default:
-      showCustomAlertModal(`Unsupported platform: ${platform}`);
-      return;
-  }
-
-  // Open share URL in new window
-  window.open(shareUrl, '_blank');
 };
 
 // Function to save location with the provided name
@@ -3579,4 +3926,35 @@ const downloadCurrentPage = async () => {
 
   // Show success message
   alert('Download started!');
+};
+
+// Function to capture blob image and copy to clipboard
+const captureBlobImageToClipboard = async (imageUrl: string): Promise<void> => {
+  try {
+    console.log('Capturing blob image:', imageUrl);
+    
+    // 使用fetch获取blob数据
+    const response = await fetch(imageUrl);
+    console.log('Fetch response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch blob: ' + response.status);
+    }
+    
+    const blob = await response.blob();
+    console.log('Blob type:', blob.type, 'size:', blob.size);
+    
+    // 写入剪贴板
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      console.log('Blob image copied to clipboard');
+    } else {
+      throw new Error('Clipboard API not supported');
+    }
+  } catch (error) {
+    console.error('Error capturing blob image:', error);
+    throw error;
+  }
 };
