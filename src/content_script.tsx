@@ -2674,21 +2674,53 @@ const shareToSocialMedia = async (platform: string) => {
     }
   }
 
+  // If no share button, show custom modal to prompt user to select a pixel
   if (!shareButton) {
-    alert('Please click the page share button first to enable this feature.');
+    showCustomAlertModal('Please select a pixel on the page first.');
     return;
   }
 
-  // Simulate click on share button
-  (shareButton as HTMLElement).click();
+  // Get location data from localStorage
+  const locationData = localStorage.getItem('location');
+  if (!locationData) {
+    showCustomAlertModal('No location data found. Please select a pixel on the page first.');
+    return;
+  }
 
-  // Wait a bit for the modal to appear and data to render
-  await new Promise(resolve => setTimeout(resolve, 500));
+  let locationObj;
+  try {
+    locationObj = JSON.parse(locationData);
+  } catch (e) {
+    console.error('Error parsing location data:', e);
+    showCustomAlertModal('Error reading location data. Please try again.');
+    return;
+  }
 
-  // Get the URL from the input
-  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
-  if (!urlInput) { alert('Could not find URL input. Please try again.'); return; }
-  const url = urlInput.value;  // Generate share URL based on platform
+  // Validate location data
+  if (!locationObj.lat || !locationObj.lng || !locationObj.zoom) {
+    showCustomAlertModal('Invalid location data. Please select a pixel on the page first.');
+    return;
+  }
+
+  // Construct URL from location data
+  const url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
+
+  // Copy map canvas to clipboard
+  try {
+    await copyMapCanvasToClipboard();
+    
+    // Show success message
+    showClipboardSuccessModal();
+    
+    // Wait 500ms before opening share URL
+    await new Promise(resolve => setTimeout(resolve, 500));
+  } catch (error) {
+    console.error('Error copying map to clipboard:', error);
+    showCustomAlertModal('Failed to copy map to clipboard. Please try again.');
+    return;
+  }
+
+  // Generate share URL based on platform
   let shareUrl = '';
   switch (platform) {
     case 'Twitter':
@@ -2716,7 +2748,7 @@ const shareToSocialMedia = async (platform: string) => {
       shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
       break;
     default:
-      alert(`Unsupported platform: ${platform}`);
+      showCustomAlertModal(`Unsupported platform: ${platform}`);
       return;
   }
 
