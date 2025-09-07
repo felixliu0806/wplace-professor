@@ -753,9 +753,9 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.borderRadius = '6px';
   controlPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   controlPanelElement.style.fontFamily = 'Arial, sans-serif';
-  controlPanelElement.style.minWidth = '180px';
-  controlPanelElement.style.width = '180px';
-  controlPanelElement.style.maxWidth = '180px';
+  controlPanelElement.style.minWidth = '200px';
+  controlPanelElement.style.width = '200px';
+  controlPanelElement.style.maxWidth = '200px';
   controlPanelElement.style.fontSize = '14px'; // Base font size
   // 移除了 userSelect: 'none'，改为只在标题区域阻止文字选择
 
@@ -850,9 +850,9 @@ const placeOverlay = (dataUrl: string) => {
     } else {
       // Maximize panel
       console.log('Maximizing control panel');
-      controlPanelElement!.style.minWidth = '180px';
-      controlPanelElement!.style.width = '180px';
-      controlPanelElement!.style.maxWidth = '180px';
+      controlPanelElement!.style.minWidth = '200px';
+      controlPanelElement!.style.width = '200px';
+      controlPanelElement!.style.maxWidth = '200px';
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       title.textContent = 'Control'; // Restore full title
@@ -1330,7 +1330,7 @@ const placeOverlay = (dataUrl: string) => {
         if (canvas) {
           canvas.style.pointerEvents = 'none'; // Keep canvas non-interactive
         }
-        modeToggleBtn.textContent = 'Disable Drag Mode';
+        modeToggleBtn.textContent = 'Undrag Overlay';
         modeToggleBtn.style.background = '#ff9800';
         
         // Add drag functionality to overlay
@@ -1341,7 +1341,7 @@ const placeOverlay = (dataUrl: string) => {
         if (canvas) {
           canvas.style.pointerEvents = 'none'; // Keep canvas non-interactive
         }
-        modeToggleBtn.textContent = 'Enable Drag Mode';
+        modeToggleBtn.textContent = 'Drag Overlay';
         modeToggleBtn.style.background = '#4CAF50';
         
         // Remove drag functionality from overlay
@@ -2185,17 +2185,16 @@ const createSaveLocationsPanel = () => {
       toggleButton.style.marginLeft = 'auto'; // Push toggle button to the right
 
       // Hide content elements container
-      const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
-      if (contentContainer) {
-        (contentContainer as HTMLElement).style.display = 'none';
+      const contentContainer1 = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+      if (contentContainer1) {
+        (contentContainer1 as HTMLElement).style.display = 'none';
       }
       console.log('Finished minimizing save locations panel');
-    } else {
-      // Maximize panel
-      console.log('Maximizing save locations panel');
-      saveLocationsPanelElement!.style.minWidth = '180px';
-      saveLocationsPanelElement!.style.width = '180px';
-      saveLocationsPanelElement!.style.maxWidth = '180px';
+    // Maximize panel
+      console.log('Maximizing control panel');
+      saveLocationsPanelElement!.style.minWidth = '200px';
+      saveLocationsPanelElement!.style.width = '200px';
+      saveLocationsPanelElement!.style.maxWidth = '200px';
       saveLocationsPanelElement!.style.padding = '12px';
       header.style.marginBottom = '8px';
       title.textContent = 'Location'; // Restore full title
@@ -2210,11 +2209,11 @@ const createSaveLocationsPanel = () => {
       toggleButton.style.marginLeft = ''; // Reset margin
 
       // Show content elements container
-      const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
-      if (contentContainer) {
-        (contentContainer as HTMLElement).style.display = '';
+      const contentContainer2 = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
+      if (contentContainer2) {
+        (contentContainer2 as HTMLElement).style.display = '';
         // Ensure social buttons container is grid
-        const socialButtonsContainer = contentContainer.querySelector('.social-buttons-container');
+        const socialButtonsContainer = contentContainer2.querySelector('.social-buttons-container');
         if (socialButtonsContainer) {
           (socialButtonsContainer as HTMLElement).style.display = 'grid';
           // Reset font sizes that might have been changed when minimized
@@ -2226,7 +2225,7 @@ const createSaveLocationsPanel = () => {
         }
         
         // Reset font sizes for save and download buttons
-        const saveBtn = contentContainer.querySelector('button');
+        const saveBtn = contentContainer2.querySelector('button');
         const downloadBtn = saveBtn?.nextElementSibling as HTMLButtonElement | null;
         if (saveBtn) {
           saveBtn.style.fontSize = '13px';
