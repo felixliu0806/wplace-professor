@@ -2263,6 +2263,10 @@ const createSaveLocationsPanel = () => {
   
   saveLocationsPanelElement.appendChild(contentContainer);
 
+  // Add event listeners
+  saveButton.addEventListener('click', saveCurrentLocation);
+  // downloadButton.addEventListener('click', downloadCurrentPage);
+
   // Add panel to document
   document.body.appendChild(saveLocationsPanelElement);
   console.log('Save locations panel added to document body');
