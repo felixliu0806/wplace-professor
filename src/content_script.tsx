@@ -1349,8 +1349,7 @@ const placeOverlay = (dataUrl: string) => {
   document.addEventListener('mouseup', controlPanelGlobalDragEndHandler);
   activeControlPanelDragListeners = true;
 
-  // Prevent text selection when dragging
-  controlPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
+  // Note: 移除了selectstart事件监听器，因为在拖拽开始函数中已经处理了防止文字选择的逻辑
 
   if (__DEV__) {
     console.log('Overlay placed at center of screen with separate control panel');
@@ -1492,9 +1491,9 @@ let controlPanelTitleContainer: HTMLDivElement | null = null;
 let controlPanelMinimizedState: boolean = false;
 
 function controlPanelGlobalDragStartHandler(e: MouseEvent) {
-  // Allow dragging from anywhere except buttons
+  // Allow dragging from title container only
   const target = e.target as HTMLElement;
-  if (target.tagName !== 'BUTTON' && controlPanelElement) {
+  if (controlPanelTitleContainer && controlPanelTitleContainer.contains(target) && controlPanelElement) {
     console.log('Control panel drag start');
     controlPanelInitialX = e.clientX - controlPanelXOffset;
     controlPanelInitialY = e.clientY - controlPanelYOffset;
@@ -1503,6 +1502,7 @@ function controlPanelGlobalDragStartHandler(e: MouseEvent) {
     e.preventDefault(); // Prevent text selection
     e.stopPropagation(); // Prevent other event handlers
   }
+  // 对于其他元素（如滑块），不阻止默认行为，允许正常交互
 }
 
 function controlPanelGlobalDragHandler(e: MouseEvent) {
