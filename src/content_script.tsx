@@ -13,6 +13,7 @@ let colorPanelElement: HTMLDivElement | null = null;
 let pixelArtDataUrl: string | null = null;
 let colorCounts: { [color: string]: number } = {};
 let scaledRef: string | null = null; // 新增的scaledRef属性
+let isDragMode = false; // 将isDragMode移到全局作用域，保持状态
 
 // State for the save locations panel
 let saveLocationsPanelElement: HTMLDivElement | null = null;
@@ -1319,7 +1320,6 @@ const placeOverlay = (dataUrl: string) => {
   });
 
   // Mode toggle button event
-  let isDragMode = false;
   modeToggleBtn.addEventListener('click', () => {
     isDragMode = !isDragMode;
     if (overlayElement) {
