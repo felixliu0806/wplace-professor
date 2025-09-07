@@ -754,6 +754,8 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   controlPanelElement.style.fontFamily = 'Arial, sans-serif';
   controlPanelElement.style.minWidth = '180px';
+  controlPanelElement.style.width = '180px';
+  controlPanelElement.style.maxWidth = '180px';
   controlPanelElement.style.fontSize = '14px'; // Base font size
   controlPanelElement.style.userSelect = 'none'; // Prevent text selection
 
@@ -822,12 +824,20 @@ const placeOverlay = (dataUrl: string) => {
       // Minimize panel
       console.log('Minimizing control panel');
       controlPanelElement!.style.minWidth = '40px';
+      controlPanelElement!.style.width = '40px';
+      controlPanelElement!.style.maxWidth = '40px';
       controlPanelElement!.style.padding = '8px';
       titleContainer.style.marginBottom = '0';
       title.textContent = 'C'; // Show only first letter
       toggleButton.textContent = '+'; // Maximize symbol
       console.log('Set title text to:', title.textContent);
       console.log('Set toggle button text to:', toggleButton.textContent);
+
+      // Adjust header styles to match Location panel when minimized
+      titleContainer.style.justifyContent = 'center'; // Center content
+      title.style.flex = '1'; // Allow title to grow
+      title.style.textAlign = 'left'; // Align text to left
+      toggleButton.style.marginLeft = 'auto'; // Push toggle button to the right
 
       // Hide all children except titleContainer
       Array.from(controlPanelElement!.children).forEach(child => {
@@ -840,12 +850,20 @@ const placeOverlay = (dataUrl: string) => {
       // Maximize panel
       console.log('Maximizing control panel');
       controlPanelElement!.style.minWidth = '180px';
+      controlPanelElement!.style.width = '180px';
+      controlPanelElement!.style.maxWidth = '180px';
       controlPanelElement!.style.padding = '12px';
       titleContainer.style.marginBottom = '8px';
       title.textContent = 'Control'; // Restore full title
       toggleButton.textContent = '−'; // Minimize symbol
       console.log('Set title text to:', title.textContent);
       console.log('Set toggle button text to:', toggleButton.textContent);
+
+      // Reset header styles to default
+      titleContainer.style.justifyContent = 'space-between'; // Reset to default
+      title.style.flex = ''; // Reset flex property
+      title.style.textAlign = ''; // Reset text alignment
+      toggleButton.style.marginLeft = ''; // Reset margin
 
       // Show all children and restore their original display properties
       opacityLabel.style.display = '';
@@ -1995,6 +2013,12 @@ const createSaveLocationsPanel = () => {
       console.log('Set title text to:', title.textContent);
       console.log('Set toggle button text to:', toggleButton.textContent);
 
+      // Adjust header styles to match Control panel when minimized
+      header.style.justifyContent = 'center'; // Center content
+      title.style.flex = '1'; // Allow title to grow
+      title.style.textAlign = 'left'; // Align text to left
+      toggleButton.style.marginLeft = 'auto'; // Push toggle button to the right
+
       // Hide content elements container
       const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
       if (contentContainer) {
@@ -2004,15 +2028,21 @@ const createSaveLocationsPanel = () => {
     } else {
       // Maximize panel
       console.log('Maximizing save locations panel');
-      saveLocationsPanelElement!.style.minWidth = '200px';
-      saveLocationsPanelElement!.style.width = '200px';
-      saveLocationsPanelElement!.style.maxWidth = '200px';
+      saveLocationsPanelElement!.style.minWidth = '180px';
+      saveLocationsPanelElement!.style.width = '180px';
+      saveLocationsPanelElement!.style.maxWidth = '180px';
       saveLocationsPanelElement!.style.padding = '12px';
       header.style.marginBottom = '8px';
       title.textContent = 'Location'; // Restore full title
       toggleButton.textContent = '−'; // Minimize symbol
       console.log('Set title text to:', title.textContent);
       console.log('Set toggle button text to:', toggleButton.textContent);
+
+      // Reset header styles to default
+      header.style.justifyContent = 'space-between'; // Reset to default
+      title.style.flex = ''; // Reset flex property
+      title.style.textAlign = ''; // Reset text alignment
+      toggleButton.style.marginLeft = ''; // Reset margin
 
       // Show content elements container
       const contentContainer = saveLocationsPanelElement!.querySelector('.save-locations-content-container');
