@@ -1232,46 +1232,55 @@ const placeOverlay = (dataUrl: string) => {
 
         // Create color panel
         createColorPanel(colorCounts, blockSize);
-
-        // Set up smooth zoom control with slider
-        zoomSlider.addEventListener('input', (e) => {
-          const scale = parseFloat((e.target as HTMLInputElement).value);
-          (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
-          // Redraw the image with new scale
-          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, scale, (window as any).currentColorFilter);
-        });
-
-        // Set up zoom buttons with same behavior as slider
-        const zoomStep = 0.01; // Step for zoom in/out buttons
-
-        // Function to perform zoom with same behavior as slider
-        const performZoom = (newScale: number) => {
-          // Update slider and label
-          zoomSlider.value = newScale.toString();
-          (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
-
-          // Redraw the image with new scale
-          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, newScale, (window as any).currentColorFilter);
-        };
-
-        zoomInBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent dragging
-          const currentScale = parseFloat(zoomSlider.value);
-          const newScale = Math.min(currentScale + zoomStep, 15.0); // Increased from 5.0 to 15.0
-          performZoom(newScale);
-        });
-
-        zoomOutBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent dragging
-          const currentScale = parseFloat(zoomSlider.value);
-          const newScale = Math.max(currentScale - zoomStep, 0.1);
-          performZoom(newScale);
-        });
       };
       scaledImg.src = scaledImageDataUrl || (window as any).currentUnscaledImageDataUrl;
     }
   };
   img.src = dataUrl;
+
+  // Set up smooth zoom control with slider
+  zoomSlider.addEventListener('input', (e) => {
+    const scale = parseFloat((e.target as HTMLInputElement).value);
+    (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
+    // We'll update the canvas when the image is loaded
+  });
+
+  // Set up zoom buttons with same behavior as slider
+  const zoomStep = 0.01; // Step for zoom in/out buttons
+
+  // Function to perform zoom with same behavior as slider
+  const performZoom = (newScale: number) => {
+    // Update slider and label
+    zoomSlider.value = newScale.toString();
+    (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
+    // We'll update the canvas when the image is loaded
+  };
+
+  zoomInBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    const currentScale = parseFloat(zoomSlider.value);
+    const newScale = Math.min(currentScale + zoomStep, 15.0); // Increased from 5.0 to 15.0
+    performZoom(newScale);
+  });
+
+  zoomOutBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    const currentScale = parseFloat(zoomSlider.value);
+    const newScale = Math.max(currentScale - zoomStep, 0.1);
+    performZoom(newScale);
+  });
+
+  // Add event listener to the opacity slider
+  opacitySlider.addEventListener('input', (e) => {
+    const opacity = parseFloat((e.target as HTMLInputElement).value);
+    (document.getElementById('opacity-label') as HTMLElement).textContent = `Opacity: ${Math.round(opacity * 100)}%`;
+
+    // Update the overlay canvas opacity
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      canvas.style.opacity = opacity.toString();
+    }
+  });
 
   // Mode toggle button event
   let isDragMode = false;
@@ -1288,73 +1297,6 @@ const placeOverlay = (dataUrl: string) => {
         overlayElement.style.pointerEvents = 'none';
         modeToggleBtn.textContent = 'Enable Drag Mode';
         modeToggleBtn.style.background = '#4CAF50';
-      }
-    }
-  });
-
-  // Direction buttons event handlers
-  const moveStep = 1; // 1 pixel movement step
-
-  upBtn.addEventListener('click', () => {
-    if (overlayElement) {
-      const currentTransform = overlayElement.style.transform;
-      // Match both translate(x, y) and translate3d(x, y, z) formats
-      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
-      if (translateMatch) {
-        const currentX = parseFloat(translateMatch[1]);
-        const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY - moveStep}px, 0)`;
-      } else {
-        // If no transform exists, set initial transform
-        overlayElement.style.transform = `translate3d(0px, ${-moveStep}px, 0)`;
-      }
-    }
-  });
-
-  downBtn.addEventListener('click', () => {
-    if (overlayElement) {
-      const currentTransform = overlayElement.style.transform;
-      // Match both translate(x, y) and translate3d(x, y, z) formats
-      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
-      if (translateMatch) {
-        const currentX = parseFloat(translateMatch[1]);
-        const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY + moveStep}px, 0)`;
-      } else {
-        // If no transform exists, set initial transform
-        overlayElement.style.transform = `translate3d(0px, ${moveStep}px, 0)`;
-      }
-    }
-  });
-
-  leftBtn.addEventListener('click', () => {
-    if (overlayElement) {
-      const currentTransform = overlayElement.style.transform;
-      // Match both translate(x, y) and translate3d(x, y, z) formats
-      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
-      if (translateMatch) {
-        const currentX = parseFloat(translateMatch[1]);
-        const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate3d(${currentX - moveStep}px, ${currentY}px, 0)`;
-      } else {
-        // If no transform exists, set initial transform
-        overlayElement.style.transform = `translate3d(${-moveStep}px, 0px, 0)`;
-      }
-    }
-  });
-
-  rightBtn.addEventListener('click', () => {
-    if (overlayElement) {
-      const currentTransform = overlayElement.style.transform;
-      // Match both translate(x, y) and translate3d(x, y, z) formats
-      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
-      if (translateMatch) {
-        const currentX = parseFloat(translateMatch[1]);
-        const currentY = parseFloat(translateMatch[2]);
-        overlayElement.style.transform = `translate3d(${currentX + moveStep}px, ${currentY}px, 0)`;
-      } else {
-        // If no transform exists, set initial transform
-        overlayElement.style.transform = `translate3d(${moveStep}px, 0px, 0)`;
       }
     }
   });
