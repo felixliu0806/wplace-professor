@@ -1276,7 +1276,20 @@ const placeOverlay = (dataUrl: string) => {
     // Update slider and label
     zoomSlider.value = newScale.toString();
     (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${newScale.toFixed(2)}x`;
-    // We'll update the canvas when the image is loaded
+
+    // Redraw the image with new scale
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = new Image();
+        img.onload = function () {
+          const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, newScale, (window as any).currentColorFilter);
+        };
+        img.src = (window as any).currentPixelArtDataUrl || '';
+      }
+    }
   };
 
   zoomInBtn.addEventListener('click', (e) => {
