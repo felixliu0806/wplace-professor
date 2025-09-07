@@ -1251,7 +1251,21 @@ const placeOverlay = (dataUrl: string) => {
     console.log('Zoom slider input event triggered');
     const scale = parseFloat((e.target as HTMLInputElement).value);
     (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
-    // We'll update the canvas when the image is loaded
+    // Redraw the image with new scale
+    const canvas = overlayElement?.querySelector('canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = new Image();
+        img.onload = function () {
+          // Get current scale from the zoom slider
+          const currentScale = parseFloat((e.target as HTMLInputElement).value);
+          const pixelScale = ((window as any).currentPixelScale || 1) * 0.01;
+          redrawCanvasWithColorBlocks(canvas, ctx, img, pixelScale, currentScale, (window as any).currentColorFilter);
+        };
+        img.src = (window as any).currentPixelArtDataUrl || '';
+      }
+    }
   });
 
   // Set up zoom buttons with same behavior as slider
@@ -1305,6 +1319,9 @@ const placeOverlay = (dataUrl: string) => {
         }
         modeToggleBtn.textContent = 'Disable Drag Mode';
         modeToggleBtn.style.background = '#ff9800';
+        
+        // Add drag functionality to overlay
+        setupOverlayDrag(overlayElement);
       } else {
         // Disable drag mode - ignore overlay for clicks
         overlayElement.style.pointerEvents = 'none';
@@ -1313,6 +1330,9 @@ const placeOverlay = (dataUrl: string) => {
         }
         modeToggleBtn.textContent = 'Enable Drag Mode';
         modeToggleBtn.style.background = '#4CAF50';
+        
+        // Remove drag functionality from overlay
+        removeOverlayDrag(overlayElement);
       }
     }
   });
@@ -1322,6 +1342,153 @@ const placeOverlay = (dataUrl: string) => {
     e.stopPropagation();
     console.log('Close button clicked, removing overlay and control panel');
     removeOverlay();
+  });
+
+  // Overlay drag functionality
+  let isOverlayDragging = false;
+  let overlayCurrentX = 0;
+  let overlayCurrentY = 0;
+  let overlayInitialX = 0;
+  let overlayInitialY = 0;
+  let overlayXOffset = 0;
+  let overlayYOffset = 0;
+
+  function setupOverlayDrag(overlay: HTMLDivElement) {
+    console.log('Setting up overlay drag');
+    
+    // Remove existing listeners if any
+    overlay.removeEventListener('mousedown', overlayDragStart);
+    overlay.removeEventListener('mouseup', overlayDragEnd);
+    
+    // Add new listeners
+    overlay.addEventListener('mousedown', overlayDragStart);
+    overlay.addEventListener('mouseup', overlayDragEnd);
+    
+    // Add global mouse move listener
+    document.addEventListener('mousemove', overlayDrag);
+  }
+
+  function removeOverlayDrag(overlay: HTMLDivElement) {
+    console.log('Removing overlay drag');
+    
+    // Remove listeners
+    overlay.removeEventListener('mousedown', overlayDragStart);
+    overlay.removeEventListener('mouseup', overlayDragEnd);
+    
+    // Remove global mouse move listener
+    document.removeEventListener('mousemove', overlayDrag);
+  }
+
+  function overlayDragStart(e: MouseEvent) {
+    if (e.button !== 0) return; // Only left mouse button
+    
+    console.log('Overlay drag start');
+    const transform = overlayElement?.style.transform || '';
+    const translateMatch = transform.match(/translate3d?\(([^,]+)px, ([^,]+)px/);
+    
+    if (translateMatch) {
+      overlayXOffset = parseFloat(translateMatch[1]);
+      overlayYOffset = parseFloat(translateMatch[2]);
+    } else {
+      overlayXOffset = 0;
+      overlayYOffset = 0;
+    }
+    
+    overlayInitialX = e.clientX - overlayXOffset;
+    overlayInitialY = e.clientY - overlayYOffset;
+    
+    isOverlayDragging = true;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function overlayDrag(e: MouseEvent) {
+    if (isOverlayDragging && overlayElement) {
+      console.log('Overlay dragging');
+      overlayCurrentX = e.clientX - overlayInitialX;
+      overlayCurrentY = e.clientY - overlayInitialY;
+      
+      overlayXOffset = overlayCurrentX;
+      overlayYOffset = overlayCurrentY;
+      
+      overlayElement.style.transform = `translate3d(${overlayCurrentX}px, ${overlayCurrentY}px, 0)`;
+    }
+  }
+
+  function overlayDragEnd(e: MouseEvent) {
+    console.log('Overlay drag end');
+    isOverlayDragging = false;
+  }
+
+  // Direction buttons event handlers
+  const moveStep = 1; // 1 pixel movement step
+
+  upBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY - moveStep}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(0px, ${-moveStep}px, 0)`;
+      }
+    }
+  });
+
+  downBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate3d(${currentX}px, ${currentY + moveStep}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(0px, ${moveStep}px, 0)`;
+      }
+    }
+  });
+
+  leftBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate3d(${currentX - moveStep}px, ${currentY}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(${-moveStep}px, 0px, 0)`;
+      }
+    }
+  });
+
+  rightBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent dragging
+    if (overlayElement) {
+      const currentTransform = overlayElement.style.transform;
+      // Match both translate(x, y) and translate3d(x, y, z) formats
+      const translateMatch = currentTransform.match(/translate3?d?\(([^,]+)px, ([^,]+)px/);
+      if (translateMatch) {
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        overlayElement.style.transform = `translate3d(${currentX + moveStep}px, ${currentY}px, 0)`;
+      } else {
+        // If no transform exists, set initial transform
+        overlayElement.style.transform = `translate3d(${moveStep}px, 0px, 0)`;
+      }
+    }
   });
 
   // Make the panel draggable
