@@ -2262,43 +2262,177 @@ const createSaveLocationsPanel = () => {
   contentContainer.appendChild(deleteAllButton);
   
   saveLocationsPanelElement.appendChild(contentContainer);
+};
+
+// Function to show a custom modal for confirming delete all locations
+const showDeleteAllLocationsModal = () => {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.id = 'wplace-delete-all-locations-modal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '100000';
+  modal.style.userSelect = 'none'; // Prevent text selection on the backdrop
+
+  // Create modal content - similar to control panel style
+  const modalContent = document.createElement('div');
+  modalContent.id = 'wplace-delete-all-locations-modal-content';
+  modalContent.style.position = 'fixed';
+  modalContent.style.top = '50%';
+  modalContent.style.left = '50%';
+  modalContent.style.transform = 'translate(-50%, -50%)';
+  modalContent.style.zIndex = '100001';
+  modalContent.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  modalContent.style.padding = '12px';
+  modalContent.style.borderRadius = '6px';
+  modalContent.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  modalContent.style.fontFamily = 'Arial, sans-serif';
+  modalContent.style.minWidth = '200px';
+  modalContent.style.fontSize = '14px';
+
+  // Create title container with drag handle
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.cursor = 'move'; // Show that this area is draggable
+
+  // Create title
+  const title = document.createElement('h3');
+  title.textContent = 'Delete All';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  title.style.flex = '1';
+  title.style.cursor = 'move'; // Also draggable
+
+  titleContainer.appendChild(title);
+
+  // Create message
+  const message = document.createElement('div');
+  message.textContent = 'Are you sure you want to delete all saved locations?';
+  message.style.fontSize = '13px';
+  message.style.marginBottom = '12px';
+  message.style.color = '#555';
+
+  // Create buttons container
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.display = 'flex';
+  buttonsContainer.style.justifyContent = 'flex-end';
+  buttonsContainer.style.gap = '6px';
+
+  // Create delete button
+  const deleteButton = document.createElement('button');
+  deleteButton.textContent = 'Delete';
+  deleteButton.style.background = '#f44336';
+  deleteButton.style.color = 'white';
+  deleteButton.style.border = 'none';
+  deleteButton.style.borderRadius = '3px';
+  deleteButton.style.padding = '6px 10px';
+  deleteButton.style.cursor = 'pointer';
+  deleteButton.style.fontSize = '13px';
+
+  // Create cancel button
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.background = '#e0e0e0';
+  cancelButton.style.color = '#333';
+  cancelButton.style.border = 'none';
+  cancelButton.style.borderRadius = '3px';
+  cancelButton.style.padding = '6px 10px';
+  cancelButton.style.cursor = 'pointer';
+  cancelButton.style.fontSize = '13px';
 
   // Add event listeners
-  saveButton.addEventListener('click', saveCurrentLocation);
-  // downloadButton.addEventListener('click', downloadCurrentPage);
+  deleteButton.addEventListener('click', () => {
+    localStorage.removeItem(SAVE_LOCATIONS_KEY);
+    refreshSavedLocationsList();
+    document.body.removeChild(modal);
+  });
 
-  // Add panel to document
-  document.body.appendChild(saveLocationsPanelElement);
-  console.log('Save locations panel added to document body');
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
 
-  // Load saved locations
-  refreshSavedLocationsList();
+  // Allow closing with Escape key
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.body.removeChild(modal);
+    }
+  });
 
-  // Make the panel draggable
-  // Clean up any existing drag listeners
-  if (activeLocationPanelDragListeners) {
-    document.removeEventListener('mousemove', locationPanelGlobalDragHandler);
-    document.removeEventListener('mouseup', locationPanelGlobalDragEndHandler);
-    activeLocationPanelDragListeners = false;
+  // Make the modal draggable like the control panel
+  let isDragging = false;
+  let currentX: number = 0;
+  let currentY: number = 0;
+  let initialX: number = 0;
+  let initialY: number = 0;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  function dragStart(e: MouseEvent) {
+    // Only drag when clicking on the title container or title
+    if (e.target === titleContainer || e.target === title) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      isDragging = true;
+      e.preventDefault(); // Prevent text selection
+    }
   }
-  
-  // Set up drag state
-  isLocationPanelDragging = false;
-  locationPanelCurrentX = 0;
-  locationPanelCurrentY = 0;
-  locationPanelInitialX = 0;
-  locationPanelInitialY = 0;
-  locationPanelXOffset = 0;
-  locationPanelYOffset = 0;
-  
+
+  function drag(e: MouseEvent) {
+    if (isDragging) {
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, modalContent);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+
+    isDragging = false;
+  }
+
+  function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+    el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
+  }
+
   // Attach event listeners for dragging
-  saveLocationsPanelElement.addEventListener('mousedown', locationPanelGlobalDragStartHandler);
-  document.addEventListener('mousemove', locationPanelGlobalDragHandler);
-  document.addEventListener('mouseup', locationPanelGlobalDragEndHandler);
-  activeLocationPanelDragListeners = true;
+  titleContainer.addEventListener('mousedown', dragStart);
+  title.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
 
   // Prevent text selection when dragging
-  saveLocationsPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
+  titleContainer.addEventListener('selectstart', (e) => e.preventDefault());
+  title.addEventListener('selectstart', (e) => e.preventDefault());
+
+  // Assemble modal
+  modalContent.appendChild(titleContainer);
+  modalContent.appendChild(message);
+  modalContent.appendChild(buttonsContainer);
+  
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(deleteButton);
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
 };
 
 // Function to delete a saved location
@@ -2681,40 +2815,45 @@ const saveCurrentLocation = async () => {
     }
   }
 
-  if (!shareButton) { alert('Please click the page share button first to enable this feature.'); return; }  // Simulate click on share button
-  (shareButton as HTMLElement).click(); // Wait a bit for the modal to appear and data to render
-  await new Promise(resolve => setTimeout(resolve, 500)); // Get the URL from the input
-  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
-  if (!urlInput) {
-    alert('Could not find URL input. Please try again.'); return;
+  // If no share button, show custom modal to prompt user to select a pixel
+  if (!shareButton) {
+    showCustomAlertModal('Please select a pixel on the page first.');
+    return;
   }
-  const url = urlInput.value;
-  
-  // Wait for the screenshot image to load before closing the modal
-  const screenshotImg = document.querySelector('dialog.modal img[alt="Screenshot"]') as HTMLImageElement;
-  if (screenshotImg && !screenshotImg.complete) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        screenshotImg.addEventListener('load', () => resolve(), { once: true });
-        screenshotImg.addEventListener('error', () => reject(), { once: true });
-        // Add a timeout to avoid waiting indefinitely
-        setTimeout(() => reject(), 5000);
-      });
-      console.log('Screenshot image loaded successfully');
-    } catch (error) {
-      console.log('Screenshot image failed to load or timeout reached');
-    }
+
+  // Get location data from localStorage
+  const locationData = localStorage.getItem('location');
+  if (!locationData) {
+    showCustomAlertModal('No location data found. Please select a pixel on the page first.');
+    return;
   }
-  
-  // Prompt user for a name using a custom modal instead of alert
-  console.log('About to show location name modal, shareButton:', shareButton);
-  showLocationNameModal(url, shareButton);
+
+  let locationObj;
+  try {
+    locationObj = JSON.parse(locationData);
+  } catch (e) {
+    console.error('Error parsing location data:', e);
+    showCustomAlertModal('Error reading location data. Please try again.');
+    return;
+  }
+
+  // Validate location data
+  if (!locationObj.lat || !locationObj.lng || !locationObj.zoom) {
+    showCustomAlertModal('Invalid location data. Please select a pixel on the page first.');
+    return;
+  }
+
+  // Construct URL from location data
+  const url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
+
+  // Prompt user for a name using a custom modal
+  showLocationNameModal(url, null);
 };
 
 // Function to show a custom modal for entering location name
 const showLocationNameModal = (url: string, shareButton: Element | null) => {
-  console.log('showLocationNameModal called with shareButton:', shareButton);
-  
+  console.log('showLocationNameModal called');
+
   // Create modal container
   const modal = document.createElement('div');
   modal.id = 'wplace-location-name-modal';
@@ -2826,29 +2965,9 @@ const showLocationNameModal = (url: string, shareButton: Element | null) => {
     }
     // Close the custom modal
     document.body.removeChild(modal);
-    
-    // Click the share button again to close the modal after 2 seconds
-    if (shareButton) {
-      console.log('Scheduling share button click in 2 seconds to close the modal. shareButton:', shareButton);
-      setTimeout(() => {
-        console.log('Clicking share button to close the modal. shareButton:', shareButton);
-        console.log('shareButton tagName:', (shareButton as HTMLElement).tagName);
-        console.log('shareButton textContent:', (shareButton as HTMLElement).textContent);
-        (shareButton as HTMLElement).click();
-      }, 2000);
-    } else {
-      console.log('shareButton is null, cannot click to close modal');
-    }
   });
 
   cancelButton.addEventListener('click', () => {
-    // Click the share button again to close the modal
-    if (shareButton) {
-      console.log('Clicking share button to close the modal immediately (cancel). shareButton:', shareButton);
-      (shareButton as HTMLElement).click();
-    } else {
-      console.log('shareButton is null, cannot click to close modal (cancel)');
-    }
     document.body.removeChild(modal);
   });
 
@@ -2859,12 +2978,6 @@ const showLocationNameModal = (url: string, shareButton: Element | null) => {
       if (locationName) {
         saveLocationWithName(url, locationName);
       }
-      // Click the share button again to close the modal
-      if (shareButton) {
-        setTimeout(() => {
-          (shareButton as HTMLElement).click();
-        }, 2000);
-      }
       document.body.removeChild(modal);
     }
   });
@@ -2872,18 +2985,6 @@ const showLocationNameModal = (url: string, shareButton: Element | null) => {
   // Allow closing with Escape key
   modal.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      // Click the share button again to close the modal after 2 seconds
-      if (shareButton) {
-        console.log('Scheduling share button click in 2 seconds to close the modal (ESC key). shareButton:', shareButton);
-        setTimeout(() => {
-          console.log('Clicking share button to close the modal (ESC key). shareButton:', shareButton);
-          console.log('shareButton tagName:', (shareButton as HTMLElement).tagName);
-          console.log('shareButton textContent:', (shareButton as HTMLElement).textContent);
-          (shareButton as HTMLElement).click();
-        }, 2000);
-      } else {
-        console.log('shareButton is null, cannot click to close modal (ESC key)');
-      }
       document.body.removeChild(modal);
     }
   });
@@ -2957,11 +3058,11 @@ const showLocationNameModal = (url: string, shareButton: Element | null) => {
   input.focus();
 };
 
-// Function to show a custom modal for confirming delete all locations
-const showDeleteAllLocationsModal = () => {
+// Function to show a custom alert modal
+const showCustomAlertModal = (message: string) => {
   // Create modal container
   const modal = document.createElement('div');
-  modal.id = 'wplace-delete-all-locations-modal';
+  modal.id = 'wplace-custom-alert-modal';
   modal.style.position = 'fixed';
   modal.style.left = '0';
   modal.style.top = '0';
@@ -2976,7 +3077,7 @@ const showDeleteAllLocationsModal = () => {
 
   // Create modal content - similar to control panel style
   const modalContent = document.createElement('div');
-  modalContent.id = 'wplace-delete-all-locations-modal-content';
+  modalContent.id = 'wplace-custom-alert-modal-content';
   modalContent.style.position = 'fixed';
   modalContent.style.top = '50%';
   modalContent.style.left = '50%';
@@ -3000,7 +3101,7 @@ const showDeleteAllLocationsModal = () => {
 
   // Create title
   const title = document.createElement('h3');
-  title.textContent = 'Delete All';
+  title.textContent = 'Notice';
   title.style.margin = '0';
   title.style.fontSize = '16px';
   title.style.fontWeight = 'bold';
@@ -3011,48 +3112,27 @@ const showDeleteAllLocationsModal = () => {
   titleContainer.appendChild(title);
 
   // Create message
-  const message = document.createElement('div');
-  message.textContent = 'Are you sure you want to delete all saved locations?';
-  message.style.fontSize = '13px';
-  message.style.marginBottom = '12px';
-  message.style.color = '#555';
+  const messageDiv = document.createElement('div');
+  messageDiv.textContent = message;
+  messageDiv.style.fontSize = '13px';
+  messageDiv.style.marginBottom = '12px';
+  messageDiv.style.color = '#555';
 
-  // Create buttons container
-  const buttonsContainer = document.createElement('div');
-  buttonsContainer.style.display = 'flex';
-  buttonsContainer.style.justifyContent = 'flex-end';
-  buttonsContainer.style.gap = '6px';
+  // Create OK button
+  const okButton = document.createElement('button');
+  okButton.textContent = 'OK';
+  okButton.style.background = '#4CAF50';
+  okButton.style.color = 'white';
+  okButton.style.border = 'none';
+  okButton.style.borderRadius = '3px';
+  okButton.style.padding = '6px 10px';
+  okButton.style.cursor = 'pointer';
+  okButton.style.fontSize = '13px';
+  okButton.style.fontWeight = 'bold';
+  okButton.style.float = 'right';
 
-  // Create delete button
-  const deleteButton = document.createElement('button');
-  deleteButton.textContent = 'Delete';
-  deleteButton.style.background = '#f44336';
-  deleteButton.style.color = 'white';
-  deleteButton.style.border = 'none';
-  deleteButton.style.borderRadius = '3px';
-  deleteButton.style.padding = '6px 10px';
-  deleteButton.style.cursor = 'pointer';
-  deleteButton.style.fontSize = '13px';
-
-  // Create cancel button
-  const cancelButton = document.createElement('button');
-  cancelButton.textContent = 'Cancel';
-  cancelButton.style.background = '#e0e0e0';
-  cancelButton.style.color = '#333';
-  cancelButton.style.border = 'none';
-  cancelButton.style.borderRadius = '3px';
-  cancelButton.style.padding = '6px 10px';
-  cancelButton.style.cursor = 'pointer';
-  cancelButton.style.fontSize = '13px';
-
-  // Add event listeners
-  deleteButton.addEventListener('click', () => {
-    localStorage.removeItem(SAVE_LOCATIONS_KEY);
-    refreshSavedLocationsList();
-    document.body.removeChild(modal);
-  });
-
-  cancelButton.addEventListener('click', () => {
+  // Add event listener
+  okButton.addEventListener('click', () => {
     document.body.removeChild(modal);
   });
 
@@ -3118,15 +3198,123 @@ const showDeleteAllLocationsModal = () => {
 
   // Assemble modal
   modalContent.appendChild(titleContainer);
-  modalContent.appendChild(message);
-  modalContent.appendChild(buttonsContainer);
-  
-  buttonsContainer.appendChild(cancelButton);
-  buttonsContainer.appendChild(deleteButton);
+  modalContent.appendChild(messageDiv);
+  modalContent.appendChild(okButton);
 
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
 };
+
+// Function to show clipboard success modal
+const showClipboardSuccessModal = () => {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.id = 'wplace-clipboard-success-modal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '100000';
+  modal.style.userSelect = 'none'; // Prevent text selection on the backdrop
+
+  // Create modal content - similar to control panel style
+  const modalContent = document.createElement('div');
+  modalContent.id = 'wplace-clipboard-success-modal-content';
+  modalContent.style.position = 'fixed';
+  modalContent.style.top = '50%';
+  modalContent.style.left = '50%';
+  modalContent.style.transform = 'translate(-50%, -50%)';
+  modalContent.style.zIndex = '100001';
+  modalContent.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+  modalContent.style.padding = '12px';
+  modalContent.style.borderRadius = '6px';
+  modalContent.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  modalContent.style.fontFamily = 'Arial, sans-serif';
+  modalContent.style.minWidth = '200px';
+  modalContent.style.fontSize = '14px';
+
+  // Create title container with drag handle
+  const titleContainer = document.createElement('div');
+  titleContainer.style.display = 'flex';
+  titleContainer.style.justifyContent = 'space-between';
+  titleContainer.style.alignItems = 'center';
+  titleContainer.style.marginBottom = '8px';
+  titleContainer.style.cursor = 'move'; // Show that this area is draggable
+
+  // Create title
+  const title = document.createElement('h3');
+  title.textContent = 'Success';
+  title.style.margin = '0';
+  title.style.fontSize = '16px';
+  title.style.fontWeight = 'bold';
+  title.style.color = '#333';
+  title.style.flex = '1';
+  title.style.cursor = 'move'; // Also draggable
+
+  titleContainer.appendChild(title);
+
+  // Create message
+  const messageDiv = document.createElement('div');
+  messageDiv.textContent = 'Current location image has been copied to clipboard.';
+  messageDiv.style.fontSize = '13px';
+  messageDiv.style.marginBottom = '12px';
+  messageDiv.style.color = '#555';
+
+  // Assemble modal
+  modalContent.appendChild(titleContainer);
+  modalContent.appendChild(messageDiv);
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Auto remove modal after 500ms
+  setTimeout(() => {
+    if (modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+  }, 500);
+};
+
+// Function to copy map canvas to clipboard
+const copyMapCanvasToClipboard = async (): Promise<void> => {
+  // Find the map canvas
+  const mapCanvas = document.querySelector('canvas.maplibregl-canvas') as HTMLCanvasElement;
+  if (!mapCanvas) {
+    throw new Error('Map canvas not found');
+  }
+
+  // Check if Clipboard API is supported
+  if (!navigator.clipboard || !window.ClipboardItem) {
+    throw new Error('Clipboard API not supported');
+  }
+
+  // Convert canvas to blob
+  return new Promise((resolve, reject) => {
+    mapCanvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error('Failed to convert canvas to blob'));
+        return;
+      }
+
+      try {
+        // Write to clipboard
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    }, 'image/png');
+  });
+};
+
+// Function to show a custom modal for confirming delete all locations
 
 // Function to share to a specific social media platform
 const shareToSpecificSocialMedia = async (platform: string) => {
@@ -3150,44 +3338,49 @@ const shareToSpecificSocialMedia = async (platform: string) => {
     }
   }
 
+  // If no share button, show custom modal to prompt user to select a pixel
   if (!shareButton) {
-    alert('Please click the page share button first to enable this feature.');
+    showCustomAlertModal('Please select a pixel on the page first.');
     return;
   }
 
-  // Simulate click on share button
-  (shareButton as HTMLElement).click();
-
-  // Wait a bit for the modal to appear and data to render
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Get the URL from the input
-  const urlInput = document.querySelector('input.text-base-content\\/80.min-w-10.grow.text-sm.font-medium') as HTMLInputElement;
-  if (!urlInput) { alert('Could not find URL input. Please try again.'); return; }
-  const url = urlInput.value;
-  
-  // Wait for the screenshot image to load before closing the modal
-  const screenshotImg = document.querySelector('dialog.modal img[alt="Screenshot"]') as HTMLImageElement;
-  if (screenshotImg && !screenshotImg.complete) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        screenshotImg.addEventListener('load', () => resolve(), { once: true });
-        screenshotImg.addEventListener('error', () => reject(), { once: true });
-        // Add a timeout to avoid waiting indefinitely
-        setTimeout(() => reject(new Error('Timeout')), 5000);
-      });
-      console.log('Screenshot image loaded successfully');
-    } catch (error) {
-      console.log('Screenshot image failed to load or timeout reached');
-    }
+  // Get location data from localStorage
+  const locationData = localStorage.getItem('location');
+  if (!locationData) {
+    showCustomAlertModal('No location data found. Please select a pixel on the page first.');
+    return;
   }
-  
-  // Find and click the copy button
-  const copyButton = document.querySelector('dialog.modal button.btn') as HTMLButtonElement;
-  if (copyButton) {
-    copyButton.click();
-  } else {
-    alert('Could not find copy button. Please try again.');
+
+  let locationObj;
+  try {
+    locationObj = JSON.parse(locationData);
+  } catch (e) {
+    console.error('Error parsing location data:', e);
+    showCustomAlertModal('Error reading location data. Please try again.');
+    return;
+  }
+
+  // Validate location data
+  if (!locationObj.lat || !locationObj.lng || !locationObj.zoom) {
+    showCustomAlertModal('Invalid location data. Please select a pixel on the page first.');
+    return;
+  }
+
+  // Construct URL from location data
+  const url = `https://wplace.live/?lat=${locationObj.lat}&lng=${locationObj.lng}&zoom=${locationObj.zoom}`;
+
+  // Copy map canvas to clipboard
+  try {
+    await copyMapCanvasToClipboard();
+    
+    // Show success message
+    showClipboardSuccessModal();
+    
+    // Wait 500ms before opening share URL
+    await new Promise(resolve => setTimeout(resolve, 500));
+  } catch (error) {
+    console.error('Error copying map to clipboard:', error);
+    showCustomAlertModal('Failed to copy map to clipboard. Please try again.');
     return;
   }
 
@@ -3219,14 +3412,9 @@ const shareToSpecificSocialMedia = async (platform: string) => {
       shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`;
       break;
     default:
-      alert(`Unsupported platform: ${platform}`);
+      showCustomAlertModal(`Unsupported platform: ${platform}`);
       return;
   }
-
-  // Close the share modal by clicking the share button again after a delay
-  setTimeout(() => {
-    (shareButton as HTMLElement).click();
-  }, 1000);
 
   // Open share URL in new window
   window.open(shareUrl, '_blank');
