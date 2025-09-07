@@ -2220,12 +2220,7 @@ const createSaveLocationsPanel = () => {
       try {
         console.log('Social media button clicked:', platform.name);
         
-        // 查找包含blob URL的<img>元素
-        let imgElement: HTMLImageElement | null = null;
-        const startTime = Date.now();
-        const timeout = 10000; // 10秒超时
-        
-        // 查找分享按钮并点击（如果图片尚未加载）
+        // 查找分享按钮
         const shareButtons = document.querySelectorAll('button.btn.btn-primary.btn-soft');
         let shareButton: Element | null = null;
         
@@ -2243,15 +2238,24 @@ const createSaveLocationsPanel = () => {
           }
         }
         
-        // 如果找到分享按钮且图片尚未加载，则点击分享按钮
-        const blobImagesBefore = document.querySelectorAll('img[src^="blob:"]');
-        if (shareButton && blobImagesBefore.length === 0) {
-          console.log('Clicking share button to trigger image generation');
-          (shareButton as HTMLElement).click();
-          
-          // 等待一段时间让图片加载
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // 如果没有找到分享按钮，立即显示错误信息
+        if (!shareButton) {
+          console.log('No share button found');
+          showCustomAlertModal('Please select a pixel on the page first.');
+          return;
         }
+        
+        // 点击分享按钮以触发图片生成
+        console.log('Clicking share button to trigger image generation');
+        (shareButton as HTMLElement).click();
+        
+        // 等待一段时间让图片加载
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 查找包含blob URL的<img>元素
+        let imgElement: HTMLImageElement | null = null;
+        const startTime = Date.now();
+        const timeout = 5000; // 5秒超时
         
         // 循环查找blob图片，直到找到元素或超时
         while (!imgElement && (Date.now() - startTime) < timeout) {
@@ -2357,9 +2361,8 @@ const createSaveLocationsPanel = () => {
           // 在新窗口中打开分享URL
           window.open(shareUrl, '_blank');
         } else {
-          console.log('No blob image element found after timeout, falling back to original share method');
-          // 如果没有找到blob图片，回退到原来的分享方法
-          shareToSocialMedia(platform.name);
+          console.log('No blob image element found after timeout');
+          showCustomAlertModal('Failed to generate image. Please try again.');
         }
       } catch (error) {
         console.error('Error capturing blob image:', error);
