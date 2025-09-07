@@ -757,7 +757,7 @@ const placeOverlay = (dataUrl: string) => {
   controlPanelElement.style.width = '180px';
   controlPanelElement.style.maxWidth = '180px';
   controlPanelElement.style.fontSize = '14px'; // Base font size
-  controlPanelElement.style.userSelect = 'none'; // Prevent text selection
+  // 移除了 userSelect: 'none'，改为只在标题区域阻止文字选择
 
   // State for panel minimized/maximized
   // When placing overlay, always initialize panel as expanded (not minimized)
@@ -781,6 +781,7 @@ const placeOverlay = (dataUrl: string) => {
   titleContainer.style.justifyContent = 'space-between';
   titleContainer.style.alignItems = 'center';
   titleContainer.style.marginBottom = '8px';
+  titleContainer.style.userSelect = 'none'; // 只在标题区域阻止文字选择
 
   const title = document.createElement('h3');
   title.textContent = 'Control'; // Changed from 'Controls'
@@ -1287,14 +1288,21 @@ const placeOverlay = (dataUrl: string) => {
   modeToggleBtn.addEventListener('click', () => {
     isDragMode = !isDragMode;
     if (overlayElement) {
+      const canvas = overlayElement.querySelector('canvas');
       if (isDragMode) {
         // Enable drag mode - allow interaction with overlay
         overlayElement.style.pointerEvents = 'auto';
+        if (canvas) {
+          canvas.style.pointerEvents = 'none'; // Keep canvas non-interactive
+        }
         modeToggleBtn.textContent = 'Disable Drag Mode';
         modeToggleBtn.style.background = '#ff9800';
       } else {
         // Disable drag mode - ignore overlay for clicks
         overlayElement.style.pointerEvents = 'none';
+        if (canvas) {
+          canvas.style.pointerEvents = 'none'; // Keep canvas non-interactive
+        }
         modeToggleBtn.textContent = 'Enable Drag Mode';
         modeToggleBtn.style.background = '#4CAF50';
       }
