@@ -911,9 +911,13 @@ const placeOverlay = (dataUrl: string) => {
   opacitySlider.style.width = '100%';
   opacitySlider.style.marginBottom = '8px';
   opacitySlider.style.cursor = 'pointer';
+  opacitySlider.style.pointerEvents = 'auto'; // 确保滑块可以交互
+
+  console.log('Creating opacity slider:', opacitySlider);
 
   // Add event listener to the opacity slider
   opacitySlider.addEventListener('input', (e) => {
+    console.log('Opacity slider input event triggered');
     const opacity = parseFloat((e.target as HTMLInputElement).value);
     (document.getElementById('opacity-label') as HTMLElement).textContent = `Opacity: ${Math.round(opacity * 100)}%`;
 
@@ -943,6 +947,9 @@ const placeOverlay = (dataUrl: string) => {
   zoomSlider.style.width = '100%';
   zoomSlider.style.marginBottom = '4px';
   zoomSlider.style.cursor = 'pointer';
+  zoomSlider.style.pointerEvents = 'auto'; // 确保滑块可以交互
+
+  console.log('Creating zoom slider:', zoomSlider);
 
   // Create zoom buttons container
   const zoomButtonsContainer = document.createElement('div');
@@ -1241,6 +1248,7 @@ const placeOverlay = (dataUrl: string) => {
 
   // Set up smooth zoom control with slider
   zoomSlider.addEventListener('input', (e) => {
+    console.log('Zoom slider input event triggered');
     const scale = parseFloat((e.target as HTMLInputElement).value);
     (document.getElementById('zoom-label') as HTMLElement).textContent = `Zoom: ${scale.toFixed(2)}x`;
     // We'll update the canvas when the image is loaded
