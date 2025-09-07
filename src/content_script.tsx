@@ -1349,7 +1349,25 @@ const placeOverlay = (dataUrl: string) => {
   document.addEventListener('mouseup', controlPanelGlobalDragEndHandler);
   activeControlPanelDragListeners = true;
 
-  // Note: 移除了selectstart事件监听器，因为在拖拽开始函数中已经处理了防止文字选择的逻辑
+  // Prevent text selection on non-interactive elements
+  controlPanelElement.addEventListener('selectstart', (e) => {
+    const target = e.target as HTMLElement;
+    // 允许在交互元素上选择文字（尽管滑块和按钮通常不需要）
+    const isInteractiveElement = 
+      target.tagName === 'INPUT' || 
+      target.tagName === 'BUTTON' || 
+      target.tagName === 'A' || 
+      target.closest('input, button, a');
+      
+    if (isInteractiveElement) {
+      // 允许交互元素上的默认行为
+      return true;
+    } else {
+      // 阻止非交互元素上的文字选择
+      e.preventDefault();
+      return false;
+    }
+  });
 
   if (__DEV__) {
     console.log('Overlay placed at center of screen with separate control panel');
@@ -1491,18 +1509,27 @@ let controlPanelTitleContainer: HTMLDivElement | null = null;
 let controlPanelMinimizedState: boolean = false;
 
 function controlPanelGlobalDragStartHandler(e: MouseEvent) {
-  // Allow dragging from title container only
+  // Allow dragging from anywhere except interactive elements
   const target = e.target as HTMLElement;
-  if (controlPanelTitleContainer && controlPanelTitleContainer.contains(target) && controlPanelElement) {
+  
+  // 检查目标元素是否是交互元素（滑块、按钮等）
+  const isInteractiveElement = 
+    target.tagName === 'INPUT' ||  // 滑块
+    target.tagName === 'BUTTON' || // 按钮
+    target.tagName === 'A' ||      // 链接
+    target.closest('input, button, a'); // 或者在这些元素内部
+  
+  // 如果不是交互元素，则允许拖动
+  if (!isInteractiveElement && controlPanelElement) {
     console.log('Control panel drag start');
     controlPanelInitialX = e.clientX - controlPanelXOffset;
     controlPanelInitialY = e.clientY - controlPanelYOffset;
 
     isControlPanelDragging = true;
-    e.preventDefault(); // Prevent text selection
-    e.stopPropagation(); // Prevent other event handlers
+    // 不再阻止默认行为，除非确实需要拖动
+    // e.preventDefault(); // 移除这行，允许正常交互
+    e.stopPropagation(); // 阻止事件冒泡，但不阻止默认行为
   }
-  // 对于其他元素（如滑块），不阻止默认行为，允许正常交互
 }
 
 function controlPanelGlobalDragHandler(e: MouseEvent) {
