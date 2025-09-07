@@ -2262,6 +2262,39 @@ const createSaveLocationsPanel = () => {
   contentContainer.appendChild(deleteAllButton);
   
   saveLocationsPanelElement.appendChild(contentContainer);
+
+  // Add panel to document
+  document.body.appendChild(saveLocationsPanelElement);
+  console.log('Save locations panel added to document body');
+
+  // Load saved locations
+  refreshSavedLocationsList();
+
+  // Make the panel draggable
+  // Clean up any existing drag listeners
+  if (activeLocationPanelDragListeners) {
+    document.removeEventListener('mousemove', locationPanelGlobalDragHandler);
+    document.removeEventListener('mouseup', locationPanelGlobalDragEndHandler);
+    activeLocationPanelDragListeners = false;
+  }
+  
+  // Set up drag state
+  isLocationPanelDragging = false;
+  locationPanelCurrentX = 0;
+  locationPanelCurrentY = 0;
+  locationPanelInitialX = 0;
+  locationPanelInitialY = 0;
+  locationPanelXOffset = 0;
+  locationPanelYOffset = 0;
+  
+  // Attach event listeners for dragging
+  saveLocationsPanelElement.addEventListener('mousedown', locationPanelGlobalDragStartHandler);
+  document.addEventListener('mousemove', locationPanelGlobalDragHandler);
+  document.addEventListener('mouseup', locationPanelGlobalDragEndHandler);
+  activeLocationPanelDragListeners = true;
+
+  // Prevent text selection when dragging
+  saveLocationsPanelElement.addEventListener('selectstart', (e) => e.preventDefault());
 };
 
 // Function to show a custom modal for confirming delete all locations
