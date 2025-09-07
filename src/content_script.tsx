@@ -2193,8 +2193,9 @@ const createSaveLocationsPanel = () => {
         (contentContainer1 as HTMLElement).style.display = 'none';
       }
       console.log('Finished minimizing save locations panel');
-    // Maximize panel
-      console.log('Maximizing control panel');
+    } else {
+      // Maximize panel
+      console.log('Maximizing save locations panel');
       saveLocationsPanelElement!.style.minWidth = '200px';
       saveLocationsPanelElement!.style.width = '200px';
       saveLocationsPanelElement!.style.maxWidth = '200px';
