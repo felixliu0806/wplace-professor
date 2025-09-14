@@ -698,6 +698,9 @@ const redrawCanvasWithBorders = (canvas: HTMLCanvasElement, ctx: CanvasRendering
 const placeOverlay = (dataUrl: string) => {
   console.log('Creating and placing overlay');
   
+  // Reset color filter when placing a new overlay
+  (window as any).currentColorFilter = null;
+  
   // Remove existing overlay and control panel if any
   // But don't remove the save locations panel
   if (overlayElement) {
